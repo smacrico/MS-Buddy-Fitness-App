@@ -24,7 +24,7 @@ start_date_str = start_date.strftime('%Y-%m-%d %H:%M:%S') # Ή '%Y-%m-%d' ανά
 
 
 #connect from EY latpop
-conn = sqlite3.connect(r'c:/smakryko/myHealthData/DBs/garmin_activities.db')
+conn = sqlite3.connect(r'c:/users/jheel/jheelHealthData/garmin_activities.db')
 
 
 
@@ -66,7 +66,7 @@ plt.show()
 
 #### conn = sqlite3.connect(r'c:/users/jheel/jheelHealthData/DBs/garmin.db')
 #connect from EY latpop
-conn = sqlite3.connect(r'c:/smakryko/myHealthData/DBs/garmin.db')
+conn = sqlite3.connect(r'c:/users/jheel/jheelHealthData/garmin.db')
 
 query_avg_sleep_last_45 = f"""
 SELECT DATE(day) AS sleep_date, AVG(total_sleep / 3600.0) AS avg_sleep_hours
@@ -96,7 +96,7 @@ plt.show()
 
 #connect from EY latpop
 # conn = sqlite3.connect(r'c:/smakryko/myHealthData/DBs/garmin_summary.db')
-conn = sqlite3.connect(r'c:/smakryko/myHealthData/DBs/garmin_summary.db')
+conn = sqlite3.connect(r'c:/users/jheel/jheelHealthData/garmin_summary.db')
 
 
 

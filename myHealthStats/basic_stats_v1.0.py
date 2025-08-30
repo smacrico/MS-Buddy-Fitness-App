@@ -15,8 +15,7 @@ import seaborn as sns
 
 
 #connect from EY latpop
-conn = sqlite3.connect(r'c:/smakryko/myHealthData/DBs/garmin_activities.db')
-
+conn = sqlite3.connect(r'c:/users/jheel/jheelHealthData/garmin_activities.db')
 
 
 # db_path = 'path/to/your/garmin_data.db'  # Αντικαταστήστε με την πραγματική διαδρομή
@@ -53,7 +52,7 @@ plt.show()
 
 #### conn = sqlite3.connect(r'c:/users/jheel/jheelHealthData/DBs/garmin.db')
 #connect from EY latpop
-conn = sqlite3.connect(r'c:/smakryko/myHealthData/DBs/garmin.db')
+conn = sqlite3.connect(r'c:/users/jheel/jheelHealthData/garmin.db')
 
 
 query_avg_sleep = """
