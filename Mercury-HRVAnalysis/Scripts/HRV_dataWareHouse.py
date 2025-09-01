@@ -8,9 +8,9 @@ from fitparse import FitFile
 
 # --- Configuration ---
 
-# --- DB Name and Log Path --- "Mercury_DWH-HRV.db"
-DB_PATH = "c:/smakrykoDBs/Mercury_DWH_HRV.db"
-LOG_PATH = "c:/temp/logsDWH/hrv_unified.log"
+# --- DB Name and Log Path --- 
+DB_PATH = "c:/smakrykoDBs/Mercury_HRV.db"
+LOG_PATH = "c:/temp/logsDWH/hrv_Mercury.log"
 
 # Setup logging
 logging.basicConfig(
