@@ -1,9 +1,9 @@
  # this file is used to analyze basic data from Garmin Forunner 245
 """ stelios (c) steliosmacrico "jHeel 2025 creating plugin"""
 
-######################################
-"jHEEL data analysis"#################
-######################################
+###############################
+### "jHEEL data analysis"######
+###############################
 
 import sqlite3
 import pandas as pd
@@ -14,8 +14,7 @@ import seaborn as sns
 ##### conn = sqlite3.connect(r'c:/users/jheel/jheelHealthData/DBs/garmin_activities.db')
 
 
-#connect from EY latpop
-conn = sqlite3.connect(r'c:/users/jheel/jheelHealthData/garmin_activities.db')
+conn = sqlite3.connect(r'c:/users/jheel/jheelHealthData/DBs/garmin_activities.db')
 
 
 # db_path = 'path/to/your/garmin_data.db'  # Αντικαταστήστε με την πραγματική διαδρομή
@@ -52,7 +51,7 @@ plt.show()
 
 #### conn = sqlite3.connect(r'c:/users/jheel/jheelHealthData/DBs/garmin.db')
 #connect from EY latpop
-conn = sqlite3.connect(r'c:/users/jheel/jheelHealthData/garmin.db')
+conn = sqlite3.connect(r'c:/users/jheel/jheelHealthData/DBs/garmin.db')
 
 
 query_avg_sleep = """

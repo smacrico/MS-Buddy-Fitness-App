@@ -31,7 +31,7 @@ class HRVAnalytics:
     with consistent recovery scoring and trend analysis.
     """
     
-    def __init__(self, db_path: str = "c:/smakrykoDBs/Mercury_DWH_HRV.db"):
+    def __init__(self, db_path: str = "c:/smakrykoDBs/Mercury_HRV.db"):
         """Initialize HRV Analytics with database path."""
         self.db_path = db_path
         self.recovery_constants = {
@@ -575,7 +575,7 @@ def main():
     print("=== HRV Analytics Demo ===")
     
     # Initialize analytics
-    hrv = HRVAnalytics("c:/smakrykoDBs/Mercury_DWH_HRV.db")
+    hrv = HRVAnalytics("c:/smakrykoDBs/Mercury_HRV.db")
     
     # Analyze trends
     print("\n1. Analyzing HRV trends...")
