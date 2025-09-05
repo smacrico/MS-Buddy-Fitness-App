@@ -1,47 +1,50 @@
-# Garmin Activities Metrics & Dashboard
+# Garmin MS Health Dashboard
 
-This package contains:
-- `garmin_metrics.py` — computes metrics from `garmin_activities.db`, exports CSVs to `outputs/` and plots to `outputs/plots/`.
-- `streamlit_app.py` — an interactive Streamlit dashboard for exploration.
-- `requirements.txt` — minimal Python dependencies.
+Interactive Streamlit dashboard for Garmin Forerunner 245 activities with automated alert monitoring and MS-specific health tracking.
 
-## Quick Start
+## Features
 
-1. Ensure you have `garmin_activities.db` (from your GarminDB workflow).
-2. (Optional) Set environment variables:
-   - `GARMIN_ACTIVITIES_DB` -> path to `garmin_activities.db` (default: `garmin_activities.db`)
-   - `GARMIN_OUTPUT_DIR` -> output directory (default: `./outputs`)
+- **Activity Metrics**
+  - Weekly training load (distance, duration, calories) by sport.
+  - Cardio efficiency (pace vs HR).
+  - Pacing consistency (lap pace variance).
+  - Heart rate drift analysis.
+  - Gait stability and stride range.
+  - Fatigue indicators (Ground Contact Time drift).
+  
+- **Automated Alerts**
+  - MS-specific flags: gait drift, HR drift, heat sensitivity.
+  - Configurable thresholds (automated baseline calculation).
+  - Slack/Email notifications for triggered alerts.
+  
+- **Alert History & Management**
+  - Table view of alerts from `alert_logs` SQLite table.
+  - **Acknowledge button** for each alert (updates `acknowledged`, `ack_by`, `ack_time`).
+  - Interactive filtering by metric and date range.
+  - Visualizations:
+    - Alert counts by metric.
+    - Daily alert counts over time.
+    
+- **Logging**
+  - Full persistence in `alert_logs` table.
+  - Tracks acknowledged alerts with user and timestamp.
 
-### Run the batch metrics + plots
+## Requirements
+
+- Python 3.9+
+- SQLite
+- Streamlit
+- Pandas
+- Matplotlib
+- Slack SDK or smtplib for email alerts (optional)
+
+See `requirements.txt` for full package list.
+
+## Installation
+
 ```bash
-python garmin_metrics.py
-
-
-
-### Instructions
-
-# Launch the interactive dashboard
+git clone <your-github-repo-url>
+cd garmin-ms-dashboard
+python -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
 pip install -r requirements.txt
-streamlit run streamlit_app.py
-
-
-## Notes & tips
-
-The scripts assume tables exist in garmin_activities.db with common columns (activities, activity_records, activity_laps, steps_activities). GarminDB versions or device differences may omit some fields; the scripts handle missing data gracefully but some charts may be empty.
-
-HR drift and the timestamp math expect activity_records.timestamp to be numeric (UNIX epoch) or other numeric values where subtraction returns duration. If your timestamps are text (ISO), convert them to epoch before running or adapt the SQL accordingly.
-
-To make the pipeline robust in production:
-
-Add a startup check that PRAGMA table_info(table) returns required columns; log and notify missing columns.
-
-Persist a unified metrics.parquet for downstream tools (Power BI / Grafana).
-
-If you want, I can:
-
-Add a Dockerfile for one-command deployment.
-
-Add a scheduled runner (cron) to refresh metrics automatically.
-
-Add email/Slack alerting for threshold breaches (e.g., sudden high HR drift).#
-

@@ -1,0 +1,32 @@
+version: "3.8"
+services:
+  streamlit:
+    build: .
+    container_name: garmin_streamlit
+    environment:
+      - GARMIN_ACTIVITIES_DB=/data/garmin_activities.db
+      - GARMIN_OUTPUT_DIR=/data/outputs
+      # Slack/email variables can be passed here or in an env_file
+      # - SLACK_WEBHOOK_URL=<your_webhook>
+      # - ALERT_SMTP_HOST=<smtp.example.com>
+      # - ALERT_SMTP_PORT=587
+      # - ALERT_SMTP_USER=<smtp_user>
+      # - ALERT_SMTP_PASS=<smtp_password>
+      # - ALERT_FROM_EMAIL=alerts@example.com
+      # - ALERT_TO_EMAIL=user@example.com
+    volumes:
+      - ./data:/data   # mount local data folder with garmin_activities.db
+    ports:
+      - "8501:8501"
+    restart: unless-stopped
+
+  metrics-runner:
+    build: .
+    container_name: garmin_metrics_runner
+    command: ["python", "/app/garmin_metrics.py"]
+    environment:
+      - GARMIN_ACTIVITIES_DB=/data/garmin_activities.db
+      - GARMIN_OUTPUT_DIR=/data/outputs
+    volumes:
+      - ./data:/data
+    restart: "no"

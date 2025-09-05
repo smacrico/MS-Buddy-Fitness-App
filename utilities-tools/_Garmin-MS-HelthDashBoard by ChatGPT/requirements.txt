@@ -1,3 +1,21 @@
-pandas
-matplotlib
-streamlit
+# Streamlit dashboard
+streamlit>=1.25.0
+
+# Data manipulation & analysis
+pandas>=2.1.0
+numpy>=1.26.0
+matplotlib>=3.8.0
+
+# SQLite database
+pysqlite3-binary>=0.4.7
+
+# Alerts & notifications
+slack_sdk>=3.26.0   # For Slack notifications
+smtplib               # Built-in Python library for email alerts (no install required)
+email-validator>=2.1.0
+
+# Optional: timezone handling
+python-dateutil>=2.9.0
+
+# Optional: for richer Streamlit interactions
+streamlit-aggrid>=0.5.0

@@ -2,14 +2,20 @@
 """
 garmin_metrics.py
 
-Query garmin_activities.db, save CSVs, and produce Matplotlib plots
-(one figure per chart, no explicit colors).
+Query garmin_activities.db, save CSVs, produce Matplotlib plots,
+and run alerts (alerts.py) to detect baseline breaches.
 """
 
 import os
 import sqlite3
 import pandas as pd
 import matplotlib.pyplot as plt
+
+# try to import alerts module (must be in same folder)
+try:
+    import alerts
+except Exception:
+    alerts = None
 
 # ------------------------------
 # Configuration
@@ -21,7 +27,7 @@ PLOTS_DIR = os.path.join(OUTPUT_DIR, "plots")
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
 # ------------------------------
-# SQL Queries
+# SQL Queries (same as before)
 # ------------------------------
 QUERIES = {
     "weekly_training_load": '''
@@ -85,7 +91,7 @@ QUERIES = {
 }
 
 # ------------------------------
-# Helpers
+# Helpers (same as earlier)
 # ------------------------------
 def fetch_df(conn, sql):
     try:
@@ -109,20 +115,15 @@ def plot_and_save(fig, name):
     plt.close(fig)
     print(f"[OK] Plot: {path}")
 
-# ------------------------------
-# Visualization functions
-# ------------------------------
+# Visualization functions (same as previous code)
 def plot_weekly_training_load(df):
     if df.empty:
-        print("[INFO] weekly_training_load: no data to plot")
         return
     d = df.copy()
     d["total_distance_km"] = d["total_distance_m"] / 1000.0
-
     pivot_dist = d.pivot_table(index="week", columns="sport", values="total_distance_km", aggfunc="sum").fillna(0)
     pivot_dur = d.pivot_table(index="week", columns="sport", values="total_duration_s", aggfunc="sum").fillna(0)
     pivot_cal = d.pivot_table(index="week", columns="sport", values="total_calories", aggfunc="sum").fillna(0)
-
     for metric_name, pivot in [("weekly_distance_km_by_sport", pivot_dist),
                                ("weekly_duration_s_by_sport", pivot_dur),
                                ("weekly_calories_by_sport", pivot_cal)]:
@@ -136,7 +137,6 @@ def plot_weekly_training_load(df):
 
 def plot_cardio_efficiency(df):
     if df.empty:
-        print("[INFO] cardio_efficiency: no data to plot")
         return
     fig = plt.figure()
     ax = plt.gca()
@@ -148,11 +148,9 @@ def plot_cardio_efficiency(df):
 
 def plot_pacing_consistency(df):
     if df.empty:
-        print("[INFO] pacing_consistency: no data to plot")
         return
     d = df.dropna(subset=["pace_variance"]).copy()
     if d.empty:
-        print("[INFO] pacing_consistency: pace_variance column empty")
         return
     d = d.sort_values("pace_variance", ascending=False).head(30)
     fig = plt.figure()
@@ -166,11 +164,9 @@ def plot_pacing_consistency(df):
 
 def plot_heart_rate_drift(df):
     if df.empty:
-        print("[INFO] heart_rate_drift: no data to plot")
         return
     d = df.dropna(subset=["hr_drift"]).copy()
     if d.empty:
-        print("[INFO] heart_rate_drift: hr_drift column empty")
         return
     d = d.sort_values("hr_drift", ascending=False).head(30)
     fig = plt.figure()
@@ -184,7 +180,6 @@ def plot_heart_rate_drift(df):
 
 def plot_gait_stability(df):
     if df.empty:
-        print("[INFO] gait_stability: no data to plot")
         return
     fig = plt.figure()
     ax = plt.gca()
@@ -196,11 +191,9 @@ def plot_gait_stability(df):
 
 def plot_fatigue_indicators(df):
     if df.empty:
-        print("[INFO] fatigue_indicators: no data to plot")
         return
     d = df.dropna(subset=["gct_drift"]).copy()
     if d.empty:
-        print("[INFO] fatigue_indicators: gct_drift column empty")
         return
     d = d.sort_values("gct_drift", ascending=False).head(30)
     fig = plt.figure()
@@ -212,22 +205,17 @@ def plot_fatigue_indicators(df):
     plt.xticks(rotation=90)
     plot_and_save(fig, "fatigue_gct_drift_top30")
 
-# ------------------------------
-# Main
-# ------------------------------
 def main():
     if not os.path.exists(DB_PATH):
         print(f"[ERROR] Database not found at {DB_PATH}")
         return
 
     conn = sqlite3.connect(DB_PATH)
-
     results = {}
     for name, sql in QUERIES.items():
         df = fetch_df(conn, sql)
         results[name] = df
         save_csv(df, name)
-
     conn.close()
 
     # Visualizations
@@ -239,6 +227,22 @@ def main():
     plot_fatigue_indicators(results.get("fatigue_indicators", pd.DataFrame()))
 
     print("[DONE] Metrics computed and plots saved to:", PLOTS_DIR)
+
+    # Run alerts if available
+    try:
+        if alerts is not None:
+            print("[INFO] Running alerts...")
+            sent = alerts.alert_on_metrics(metrics_dir=OUTPUT_DIR)
+            if sent:
+                print("[INFO] Alerts sent:", sent)
+            else:
+                print("[INFO] No alerts triggered.")
+        else:
+            print("[INFO] alerts module not available; skipping alerts.")
+    except Exception as e:
+        print("[ERROR] Exception while running alerts:", e)
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()
