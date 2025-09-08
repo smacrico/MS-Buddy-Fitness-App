@@ -3,10 +3,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
-from HRV_dwhAnalytics_v2 import HRVAnalytics
+from HRV_Analytics_v3 import HRVAnalytics
 
 # --- Initialize Analytics ---
-hrv = HRVAnalytics("Mercury_DWH-HRV.db")
+hrv = HRVAnalytics("Mercury_HRV.db")
 
 # --- Sidebar Controls ---
 st.sidebar.header("HRV Dashboard Controls")
