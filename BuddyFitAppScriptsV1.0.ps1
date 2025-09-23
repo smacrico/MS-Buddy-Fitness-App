@@ -1,6 +1,6 @@
 ## order to execut scripts
 
-## Updat Main GarminData ###
+## Update Main GarminData ###
 
 
 
