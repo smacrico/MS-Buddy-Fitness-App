@@ -1,0 +1,52 @@
+{
+  "name": "Clinical Trend Theme",
+  "textClasses": {
+    "label": {
+      "fontSize": 11
+    }
+  },
+  "dataColors": [
+    "#0072B2",
+    "#D55E00",
+    "#009E73",
+    "#CC79A7",
+    "#F0E442",
+    "#56B4E9",
+    "#E69F00",
+    "#000000"
+  ],
+  "visualStyles": {
+    "*": {
+      "*": {
+        "title": [
+          {
+            "fontSize": 12,
+            "fontFamily": "Segoe UI Semibold"
+          }
+        ],
+        "labels": [
+          {
+            "fontSize": 11
+          }
+        ],
+        "categoryLabels": [
+          {
+            "fontSize": 10
+          }
+        ],
+        "legend": [
+          {
+            "titleText": {
+              "fontSize": 11
+            },
+            "labelColor": {
+              "solid": {
+                "color": "#444444"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
