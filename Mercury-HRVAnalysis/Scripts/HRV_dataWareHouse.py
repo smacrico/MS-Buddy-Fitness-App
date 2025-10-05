@@ -222,7 +222,7 @@ def ingest_folder(folder_path, source_hint=None):
 def analyze_hrv_trends(days=30):
     conn = sqlite3.connect(DB_PATH)
     query = """
-    SELECT date(timestamp) as date, AVG(hrv_armssd) as avg_rmssd, AVG(sdnn) as avg_sdnn
+    SELECT date(timestamp) as date, AVG(armssd) as avg_rmssd, AVG(asdnn) as avg_sdnn
     FROM hrv_sessions
     WHERE timestamp >= date('now', ?) and name is 'F3b Monitor+HRV'
     GROUP BY date(timestamp)
@@ -280,10 +280,10 @@ def establish_baseline(days=21):
     """Establish personal HRV baseline over specified days"""
     conn = sqlite3.connect(DB_PATH)
     query = """
-    SELECT date(timestamp) as date, AVG(hrv_rmssd) as avg_rmssd, 
-           AVG(sdnn) as avg_sdnn, AVG(hrv_pnn50) as avg_pnn50
+    SELECT date(timestamp) as date, AVG(armssd) as avg_rmssd, 
+           AVG(asdnn) as avg_sdnn, AVG(pnn50) as avg_pnn50
     FROM hrv_sessions
-    WHERE timestamp >= date('now', ?) AND hrv_rmssd IS NOT NULL
+    WHERE timestamp >= date('now', ?) AND armssd IS NOT NULL
     GROUP BY date(timestamp)
     ORDER BY date(timestamp) DESC
     """
@@ -314,10 +314,10 @@ def detect_hrv_drops(baseline, days=7, drop_threshold=0.7):
     """Detect sudden HRV drops below baseline"""
     conn = sqlite3.connect(DB_PATH)
     query = """
-    SELECT date(timestamp) as date, AVG(hrv_rmssd) as avg_rmssd,
-           AVG(sdnn) as avg_sdnn, COUNT(*) as readings
+    SELECT date(timestamp) as date, AVG(armssd) as avg_rmssd,
+           AVG(asdnn) as avg_sdnn, COUNT(*) as readings
     FROM hrv_sessions
-    WHERE timestamp >= date('now', ?) AND hrv_rmssd IS NOT NULL
+    WHERE timestamp >= date('now', ?) AND armssd IS NOT NULL
     GROUP BY date(timestamp)
     ORDER BY date(timestamp) DESC
     """
@@ -347,9 +347,9 @@ def detect_sustained_low_hrv(baseline, days=14, consecutive_days=3):
     """Detect sustained low HRV periods"""
     conn = sqlite3.connect(DB_PATH)
     query = """
-    SELECT date(timestamp) as date, AVG(hrv_rmssd) as avg_rmssd
+    SELECT date(timestamp) as date, AVG(armssd) as avg_rmssd
     FROM hrv_sessions
-    WHERE timestamp >= date('now', ?) AND hrv_rmssd IS NOT NULL
+    WHERE timestamp >= date('now', ?) AND armssd IS NOT NULL
     GROUP BY date(timestamp)
     ORDER BY date(timestamp) ASC
     """
@@ -392,9 +392,9 @@ def calculate_hrv_7day_average():
     """Calculate rolling 7-day HRV average"""
     conn = sqlite3.connect(DB_PATH)
     query = """
-    SELECT date(timestamp) as date, AVG(hrv_rmssd) as daily_rmssd
+    SELECT date(timestamp) as date, AVG(armssd) as daily_rmssd
     FROM hrv_sessions
-    WHERE timestamp >= date('now', '-30 days') AND hrv_rmssd IS NOT NULL
+    WHERE timestamp >= date('now', '-30 days') AND armssd IS NOT NULL
     GROUP BY date(timestamp)
     ORDER BY date(timestamp) DESC
     """
@@ -414,10 +414,39 @@ def detect_erratic_patterns(days=14):
     """Detect erratic HRV patterns (high variability)"""
     conn = sqlite3.connect(DB_PATH)
     query = """
-    SELECT date(timestamp) as date, AVG(hrv_rmssd) as avg_rmssd,
-           STDEV(hrv_rmssd) as std_rmssd, COUNT(*) as readings
+    SELECT date(timestamp) as date, armssd
     FROM hrv_sessions
-    WHERE timestamp >= date('now', ?) AND hrv_rmssd IS NOT NULL
+    WHERE timestamp >= date('now', ?) AND armssd IS NOT NULL
+    ORDER BY date(timestamp) DESC
+    """
+    df_raw = pd.read_sql_query(query, conn, params=(f'-{days} days',))
+    conn.close()
+    
+    if df_raw.empty:
+        return []
+    
+    # Group by date using pandas to calculate mean, std, and count
+    grouped = df_raw.groupby('date')['armssd'].agg(['mean', 'std', 'count']).reset_index()
+    grouped.rename(columns={'mean': 'avg_rmssd', 'std': 'std_rmssd', 'count': 'readings'}, inplace=True)
+    
+    # Calculate coefficient of variation (cv)
+    grouped['cv'] = grouped['std_rmssd'] / grouped['avg_rmssd']
+    high_variability_threshold = grouped['cv'].quantile(0.8)  # top 20% most variable days
+    
+    erratic_days = grouped[grouped['cv'] > high_variability_threshold].copy()
+    
+    return erratic_days[['date', 'avg_rmssd', 'std_rmssd', 'cv']].to_dict('records')
+
+
+
+def detect_erratic_patternsOLDOLDOLD(days=14):
+    """Detect erratic HRV patterns (high variability)"""
+    conn = sqlite3.connect(DB_PATH)
+    query = """
+    SELECT date(timestamp) as date, AVG(armssd) as avg_rmssd,
+           STDEV(armssd) as std_rmssd, COUNT(*) as readings
+    FROM hrv_sessions
+    WHERE timestamp >= date('now', ?) AND armssd IS NOT NULL
     GROUP BY date(timestamp)
     HAVING COUNT(*) > 1
     ORDER BY date(timestamp) DESC
@@ -525,7 +554,7 @@ if __name__ == "__main__":
     # Example: ingest all .fit files from a folder
     # ingest_folder("C:/smakryko/myHealthData/HealtDataSystemAnalysis/TestFitFiles/Garmin", source_hint="GARMIN")
     
-    ingest_folder("c:/users/jheel/jheelhealthdata/fitfiles/activities", source_hint="GARMIN")
+    # ingest_folder("c:/users/jheel/jheelhealthdata/fitfiles/activities", source_hint="GARMIN")
     
     # ingest_folder("C:/smakryko/myHealthData/FitFiles/Activities", source_hint="GARMIN")
     # Run analytics
