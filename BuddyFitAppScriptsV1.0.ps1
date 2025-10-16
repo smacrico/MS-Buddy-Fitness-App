@@ -20,7 +20,11 @@
     streamlit run scripts/app.py
 
 ## HRV Analysis
+    ## HRV Data Warehouse (v1.0 & v2.0)
+    ## v1.0 is the 'old' version, v2.0 is the new version with more features
 & C:/Python313/python.exe "C:/smakrykoDev/GitHubRepos/MS-Buddy-Fitness-App/Mercury-HRVAnalysis/scripts/HRV_datawarehouse.py"
+& C:/Python313/python.exe "C:/smakrykoDev/GitHubRepos/MS-Buddy-Fitness-App/Mercury-HRVAnalysis/scripts/HRV_dataWareHouse_V2.0.py"
+
 
 & C:/Python313/python.exe "C:/smakrykoDev/GitHubRepos/MS-Buddy-Fitness-App/Mercury-HRVAnalysis/scripts/HRV_Analytics_v3.py"
 & C:/Python313/python.exe "C:/smakrykoDev/GitHubRepos/MS-Buddy-Fitness-App/Mercury-HRVAnalysis/scripts/HRV_Analytics_v3.3.py"
