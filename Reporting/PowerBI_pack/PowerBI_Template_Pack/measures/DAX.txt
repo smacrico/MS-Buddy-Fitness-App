@@ -1,0 +1,35 @@
+-- Place these measures in the *Long* table (Model view > New measure)
+
+Value := SUM ( Long[value] )
+
+Latest Date := MAX ( Long[date_iso] )
+
+Previous Date :=
+VAR __cur = [Latest Date]
+RETURN
+    CALCULATE(
+        MAX ( Long[date_iso] ),
+        FILTER ( ALLSELECTED ( Long[date_iso] ), Long[date_iso] < __cur )
+    )
+
+Latest Value :=
+VAR __d = [Latest Date]
+RETURN CALCULATE ( [Value], Long[date_iso] = __d )
+
+Previous Value :=
+VAR __p = [Previous Date]
+RETURN CALCULATE ( [Value], Long[date_iso] = __p )
+
+Delta := [Latest Value] - [Previous Value]
+
+Delta % := DIVIDE ( [Delta], [Previous Value] )
+
+Moving Avg (3) :=
+VAR __d = [Latest Date]
+VAR __T =
+    TOPN (
+        3,
+        FILTER ( ALLSELECTED ( Long ), Long[date_iso] <= __d ),
+        Long[date_iso], DESC
+    )
+RETURN AVERAGEX ( __T, [Value] )

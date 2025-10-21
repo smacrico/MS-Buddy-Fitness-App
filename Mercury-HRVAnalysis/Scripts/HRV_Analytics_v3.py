@@ -1,8 +1,11 @@
 """
-HRV Analytics Data Warehouse - Version 2.1
+HRV Analytics Data Warehouse - Version 3.0
 
-Updated script with saving baselines and trend statistics to database,
-plus added visuals for baselines, trend summary, and latest recovery score.
+- Loads HRV data from view 'f3bHRV_view' and copies it to 'hrv_data' table
+- Maps 'armssd'->'rmssd', 'asdnn'->'sdnn', calculates pnn50 from NN50/(NN20+NN50)
+- Sets 'name' field for source tracking (default 'F3b_import')
+- Normal HRV analysis and trend/statistics/visuals pipeline as before
+- Adds database-saving of baselines and trends
 """
 
 import sqlite3
@@ -11,7 +14,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime, timedelta
-from typing import Dict, Any
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -47,53 +49,86 @@ class HRVAnalytics:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                # Ensure core table exists
                 cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS hrv_data (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        date TEXT NOT NULL,
-                        name TEXT NOT NULL,
-                        rmssd REAL,
-                        sdnn REAL,
-                        pnn50 REAL,
-                        lf_power REAL,
-                        hf_power REAL,
-                        stress_index REAL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
+                CREATE TABLE IF NOT EXISTS hrv_data (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    rmssd REAL,
+                    sdnn REAL,
+                    pnn50 REAL,
+                    lf_power REAL,
+                    hf_power REAL,
+                    stress_index REAL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
                 """)
-                # Baselines table for summary
                 cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS hrv_baselines (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        source_name TEXT,
-                        analysis_date TEXT,
-                        avg_rmssd REAL,
-                        avg_sdnn REAL,
-                        avg_pnn50 REAL
-                    )
+                CREATE TABLE IF NOT EXISTS hrv_baselines (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source_name TEXT,
+                    analysis_date TEXT,
+                    avg_rmssd REAL,
+                    avg_sdnn REAL,
+                    avg_pnn50 REAL
+                )
                 """)
-                # Trends table for detailed stats & latest recovery score
                 cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS hrv_trends (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        source_name TEXT,
-                        analysis_date TEXT,
-                        metric TEXT,
-                        correlation REAL,
-                        trend_direction TEXT,
-                        trend_strength TEXT,
-                        mean REAL,
-                        std REAL,
-                        min REAL,
-                        max REAL,
-                        latest_recovery_score REAL
-                    )
+                CREATE TABLE IF NOT EXISTS hrv_trends (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source_name TEXT,
+                    analysis_date TEXT,
+                    metric TEXT,
+                    correlation REAL,
+                    trend_direction TEXT,
+                    trend_strength TEXT,
+                    mean REAL,
+                    std REAL,
+                    min REAL,
+                    max REAL,
+                    latest_recovery_score REAL
+                )
                 """)
                 conn.commit()
                 logger.info("Database schema ensured.")
         except sqlite3.Error as e:
             logger.error(f"Database schema error: {e}")
+
+    def import_f3b_view_to_hrv_data(self, source_view: str = "f3bHRV_view", device_name: str = "F3b_import"):
+        """
+        Import data from f3bHRV_view into hrv_data table for processing.
+        Maps columns and calculates pnn50 from NN50/(NN20+NN50) * 100.
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                df = pd.read_sql_query(f"SELECT * FROM {source_view}", conn)
+                if df.empty:
+                    logger.warning(f"No rows found in {source_view}.")
+                    return
+                df['rmssd'] = df['armssd']
+                df['sdnn'] = df['asdnn']
+                # pNN50 calculation: if no NN20, fallback to just NN50 counts
+                if 'NN20' in df.columns:
+                    total_nn = df['NN20'] + df['NN50']
+                    df['pnn50'] = np.where(total_nn>0, df['NN50']/total_nn*100, 0)
+                else:
+                    df['pnn50'] = df['NN50']
+                df['name'] = device_name
+                for col in ['lf_power', 'hf_power', 'stress_index']:
+                    if col not in df.columns:
+                        df[col] = 0.0
+                insert_cols = ['date', 'name', 'rmssd', 'sdnn', 'pnn50', 'lf_power', 'hf_power', 'stress_index']
+                df_to_insert = df[insert_cols].copy()
+                # Remove any duplicates in hrv_data for this name+date before inserting
+                existing = pd.read_sql_query(f"SELECT date FROM hrv_data WHERE name = ?", conn, params=[device_name])
+                overlapping = set(df_to_insert['date']).intersection(set(existing['date']))
+                if overlapping:
+                    for d in overlapping:
+                        conn.execute("DELETE FROM hrv_data WHERE name = ? AND date = ?", (device_name, d))
+                df_to_insert.to_sql('hrv_data', conn, if_exists='append', index=False)
+                logger.info(f"Imported {len(df_to_insert)} rows from {source_view} to hrv_data as '{device_name}'.")
+        except Exception as e:
+            logger.error(f"Error importing data from view: {e}")
 
     @staticmethod
     def safe_divide(numerator: float, denominator: float, default: float = 0.0) -> float:
@@ -103,7 +138,7 @@ class HRVAnalytics:
     def normalize_score(score: float, min_val: float = 0.0, max_val: float = 100.0) -> float:
         return max(min_val, min(max_val, score))
 
-    def get_daily_hrv_dataframe(self, days_back: int = 30, source_name: str = "HRV") -> pd.DataFrame:
+    def get_daily_hrv_dataframe(self, days_back: int = 30, source_name: str = "F3b_import") -> pd.DataFrame:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 query = f"""
@@ -118,8 +153,8 @@ class HRVAnalytics:
                 logger.warning("No data found, generating sample data")
                 return self._generate_sample_trend_data(days_back)
             df['date'] = pd.to_datetime(df['date'])
-            numeric_columns = ['rmssd', 'sdnn', 'pnn50', 'lf_power', 'hf_power', 'stress_index']
-            df[numeric_columns] = df[numeric_columns].fillna(0)
+            for col in ['rmssd', 'sdnn', 'pnn50', 'lf_power', 'hf_power', 'stress_index']:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             return df
         except sqlite3.Error as e:
             logger.error(f"Database error: {e}")
@@ -150,7 +185,7 @@ class HRVAnalytics:
         data['stress_index'] = np.maximum(data['stress_index'], 0)
         return pd.DataFrame(data)
 
-    def _get_personal_baselines(self, source_name: str = "HRV") -> Dict[str, float]:
+    def _get_personal_baselines(self, source_name: str = "F3b_import") -> dict:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 query = """
@@ -164,25 +199,17 @@ class HRVAnalytics:
                 result = pd.read_sql_query(query, conn, params=[source_name])
             if result.empty or result.iloc[0].isna().all():
                 logger.warning("No baseline data found, using default values")
-                return {
-                    'avg_rmssd': 45.0,
-                    'avg_sdnn': 50.0,
-                    'avg_pnn50': 15.0
-                }
-            baselines = result.iloc[0].to_dict()
-            for k, v in baselines.items():
-                if pd.isna(v):
+                return {'avg_rmssd': 45.0, 'avg_sdnn': 50.0, 'avg_pnn50': 15.0}
+            baselines = dict(result.iloc[0])
+            for k in baselines:
+                if pd.isna(baselines[k]):
                     baselines[k] = 0.0
             return baselines
         except sqlite3.Error as e:
             logger.error(f"Error getting baselines: {e}")
-            return {
-                'avg_rmssd': 45.0,
-                'avg_sdnn': 50.0,
-                'avg_pnn50': 15.0
-            }
+            return {'avg_rmssd': 45.0, 'avg_sdnn': 50.0, 'avg_pnn50': 15.0}
 
-    def save_baselines(self, baselines: Dict[str, float], source_name: str = "HRV"):
+    def save_baselines(self, baselines: dict, source_name: str = "F3b_import"):
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
@@ -196,101 +223,40 @@ class HRVAnalytics:
         except sqlite3.Error as e:
             logger.error(f"Error saving baselines: {e}")
 
-    def save_trends(self, stats: Dict[str, Any], latest_recovery_score: float, source_name: str = "HRV"):
+    def save_trends(self, stats: dict, latest_recovery_score: float, source_name: str = "F3b_import"):
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 analysis_date = datetime.now().strftime('%Y-%m-%d')
                 for metric, data in stats.items():
                     cursor.execute("""
-                        INSERT INTO hrv_trends (source_name, analysis_date, metric, correlation,
-                                                trend_direction, trend_strength, mean, std, min, max,
-                                                latest_recovery_score)
+                        INSERT INTO hrv_trends
+                        (source_name, analysis_date, metric, correlation,
+                         trend_direction, trend_strength, mean, std, min, max,
+                         latest_recovery_score)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (source_name, analysis_date, metric, data.get('correlation', 0.0),
                           data.get('trend_direction', ''), data.get('trend_strength', ''),
-                          data.get('mean', 0.0), data.get('std', 0.0), data.get('min', 0.0),
+                          data.get('mean', 0.0), data.get('std', 0.0), data.get('min',0.0),
                           data.get('max', 0.0), latest_recovery_score))
                 conn.commit()
                 logger.info("Trend statistics saved successfully")
         except sqlite3.Error as e:
             logger.error(f"Error saving trend statistics: {e}")
 
-    def _calculate_simple_recovery_score(self, rmssd: float, sdnn: float, pnn50: float) -> float:
+    def _calculate_simple_recovery_score(self, rmssd, sdnn, pnn50) -> float:
         c = self.recovery_constants['simple']
-        rmssd = rmssd or 0.0
-        sdnn = sdnn or 0.0
-        pnn50 = pnn50 or 0.0
         rmssd_score = (rmssd / c['rmssd_scale']) * c['rmssd_weight']
         sdnn_score = (sdnn / c['sdnn_scale']) * c['sdnn_weight']
         pnn50_score = (pnn50 / c['pnn50_scale']) * c['pnn50_weight']
-        raw_score = rmssd_score + sdnn_score + pnn50_score
-        return self.normalize_score(raw_score, 0, 100)
+        return self.normalize_score(rmssd_score + sdnn_score + pnn50_score, 0, 100)
 
-    def _calculate_comprehensive_recovery_score(self, rmssd: float, sdnn: float, pnn50: float,
-                                                lf_power: float = 0, hf_power: float = 0,
-                                                stress_index: float = 0) -> float:
-        c = self.recovery_constants['comprehensive']
-        rmssd = rmssd or 0.0
-        sdnn = sdnn or 0.0
-        pnn50 = pnn50 or 0.0
-        lf_power = lf_power or 0.0
-        hf_power = hf_power or 0.0
-        stress_index = stress_index or 0.0
-        time_domain = (
-            (rmssd / c['rmssd_scale']) * 0.4 +
-            (sdnn / c['sdnn_scale']) * 0.35 +
-            (pnn50 / c['pnn50_scale']) * 0.25
-        ) * c['time_domain_weight']
-        lf_hf_ratio = self.safe_divide(lf_power, hf_power, 1.0)
-        freq_domain = (
-            (lf_power / c['lf_scale']) * 0.4 +
-            (hf_power / c['hf_scale']) * 0.4 +
-            (1 / max(lf_hf_ratio, 0.1)) * 0.2
-        ) * c['freq_domain_weight']
-        stress_component = (
-            max(0, c['stress_scale'] - stress_index) / c['stress_scale']
-        ) * c['stress_weight']
-        raw_score = time_domain + freq_domain + stress_component
-        return self.normalize_score(raw_score * 100, 0, 100)
-
-    def _calculate_personalized_recovery_score(self, rmssd: float, sdnn: float, pnn50: float,
-                                               lf_power: float = 0, hf_power: float = 0,
-                                               stress_index: float = 0,
-                                               source_name: str = "HRV") -> float:
-        baselines = self._get_personal_baselines(source_name)
-        rmssd = rmssd or 0.0
-        sdnn = sdnn or 0.0
-        pnn50 = pnn50 or 0.0
-        lf_power = lf_power or 0.0
-        hf_power = hf_power or 0.0
-        stress_index = stress_index or 0.0
-        rmssd_relative = self.safe_divide(rmssd, baselines['avg_rmssd'], 1.0)
-        sdnn_relative = self.safe_divide(sdnn, baselines['avg_sdnn'], 1.0)
-        pnn50_relative = self.safe_divide(pnn50, baselines['avg_pnn50'], 1.0)
-        # Assuming lf/hf/stress baselines zero if missing in previous data scenario:
-        lf_relative = self.safe_divide(lf_power, 1, 0)
-        hf_relative = self.safe_divide(hf_power, 1, 0)
-        stress_relative = self.safe_divide(1, max(stress_index, 0.1), 0)
-        score = (
-            rmssd_relative * 0.25 +
-            sdnn_relative * 0.25 +
-            pnn50_relative * 0.20 +
-            lf_relative * 0.10 +
-            hf_relative * 0.10 +
-            stress_relative * 0.10
-        ) * 100
-        return self.normalize_score(score, 0, 100)
-
-    def analyze_hrv_trends(self, days_back: int = 30, source_name: str = "HRV", include_stats: bool = True) -> Dict[str, Any]:
+    def analyze_hrv_trends(self, days_back=30, source_name: str = "F3b_import", include_stats: bool = True):
         df = self.get_daily_hrv_dataframe(days_back, source_name)
         if df.empty:
             return {"error": "No data available for analysis"}
-        df['simple_recovery'] = df.apply(lambda r: self._calculate_simple_recovery_score(r['rmssd'], r['sdnn'], r['pnn50']), axis=1)
-        df['comprehensive_recovery'] = df.apply(lambda r: self._calculate_comprehensive_recovery_score(
-            r['rmssd'], r['sdnn'], r['pnn50'], r['lf_power'], r['hf_power'], r['stress_index']), axis=1)
-        df['personalized_recovery'] = df.apply(lambda r: self._calculate_personalized_recovery_score(
-            r['rmssd'], r['sdnn'], r['pnn50'], r['lf_power'], r['hf_power'], r['stress_index'], source_name), axis=1)
+        df['simple_recovery'] = df.apply(
+            lambda r: self._calculate_simple_recovery_score(r['rmssd'], r['sdnn'], r['pnn50']), axis=1)
 
         result = {
             'data_points': len(df),
@@ -304,9 +270,7 @@ class HRVAnalytics:
                 'pnn50': float(df.iloc[0]['pnn50'])
             },
             'recovery_scores': {
-                'simple': float(df.iloc[0]['simple_recovery']),
-                'comprehensive': float(df.iloc[0]['comprehensive_recovery']),
-                'personalized': float(df.iloc[0]['personalized_recovery'])
+                'simple': float(df.iloc[0]['simple_recovery'])
             },
             'dataframe': df
         }
@@ -316,11 +280,11 @@ class HRVAnalytics:
 
         return result
 
-    def _calculate_trend_statistics(self, df: pd.DataFrame) -> Dict[str, Any]:
+    def _calculate_trend_statistics(self, df: pd.DataFrame) -> dict:
         stats = {}
         df_copy = df.copy()
         df_copy['day_index'] = range(len(df_copy))
-        metrics = ['rmssd', 'sdnn', 'pnn50', 'simple_recovery', 'comprehensive_recovery', 'personalized_recovery']
+        metrics = ['rmssd', 'sdnn', 'pnn50', 'simple_recovery']
         for metric in metrics:
             if metric in df_copy.columns:
                 correlation = df_copy['day_index'].corr(df_copy[metric])
@@ -343,136 +307,76 @@ class HRVAnalytics:
         return stats
 
     def plot_hrv_trend(self, df: pd.DataFrame, title: str = "HRV Trends") -> None:
-        try:
-            fig, axes = plt.subplots(2, 2, figsize=(15,10))
-            fig.suptitle(title, fontsize=16)
-
-            # Time domain metrics
-            axes[0,0].plot(df['date'], df['rmssd'], 'b-', label='RMSSD', marker='o')
-            axes[0,0].plot(df['date'], df['sdnn'], 'r-', label='SDNN', marker='s')
-            axes[0,0].set_title('Time Domain Metrics')
-            axes[0,0].set_ylabel('ms')
-            axes[0,0].legend()
-            axes[0,0].tick_params(axis='x', rotation=45)
-
-            # Recovery scores
-            axes[0,1].plot(df['date'], df['simple_recovery'], 'g-', label='Simple', marker='o')
-            axes[0,1].plot(df['date'], df['comprehensive_recovery'], 'b-', label='Comprehensive', marker='s')
-            axes[0,1].plot(df['date'], df['personalized_recovery'], 'r-', label='Personalized', marker='^')
-            axes[0,1].set_title('Recovery Scores')
-            axes[0,1].set_ylabel('Score (0-100)')
-            axes[0,1].legend()
-            axes[0,1].tick_params(axis='x', rotation=45)
-
-            # Frequency domain (if applicable)
-            if 'lf_power' in df.columns and 'hf_power' in df.columns:
-                axes[1,0].plot(df['date'], df['lf_power'], 'orange', label='LF Power', marker='o')
-                axes[1,0].plot(df['date'], df['hf_power'], 'purple', label='HF Power', marker='s')
-                axes[1,0].set_title('Frequency Domain')
-                axes[1,0].set_ylabel('ms²')
-                axes[1,0].legend()
-                axes[1,0].tick_params(axis='x', rotation=45)
-
-            # pNN50 and stress
-            axes[1,1].plot(df['date'], df['pnn50'], 'brown', label='pNN50', marker='o')
-            if 'stress_index' in df.columns:
-                ax2 = axes[1,1].twinx()
-                ax2.plot(df['date'], df['stress_index'], 'red', label='Stress Index', marker='s', alpha=0.7)
-                ax2.set_ylabel('Stress Index', color='red')
-                ax2.legend(loc='upper right')
-            axes[1,1].set_title('pNN50 & Stress')
-            axes[1,1].set_ylabel('pNN50 (%)', color='brown')
-            axes[1,1].legend(loc='upper left')
-            axes[1,1].tick_params(axis='x', rotation=45)
-
-            plt.tight_layout()
-            plt.show()
-        except Exception as e:
-            logger.error(f"Error plotting HRV trends: {e}")
-            print(f"Could not create trend plot: {e}")
-
-    def plot_hrv_histogram(self, df: pd.DataFrame, title: str = "HRV Distribution") -> None:
-        try:
-            fig, axes = plt.subplots(2, 3, figsize=(15,8))
-            fig.suptitle(title, fontsize=16)
-            metrics = [
-                ('rmssd', 'RMSSD (ms)', 'blue'),
-                ('sdnn', 'SDNN (ms)', 'red'),
-                ('pnn50', 'pNN50 (%)', 'green'),
-                ('simple_recovery', 'Simple Recovery', 'orange'),
-                ('comprehensive_recovery', 'Comprehensive Recovery', 'purple'),
-                ('personalized_recovery', 'Personalized Recovery', 'brown')
-            ]
-            for i, (metric, label, color) in enumerate(metrics):
-                row, col = divmod(i, 3)
-                if metric in df.columns:
-                    axes[row, col].hist(df[metric], bins=15, alpha=0.7, color=color, edgecolor='black')
-                    mean_val = df[metric].mean()
-                    axes[row, col].axvline(mean_val, color='red', linestyle='--', alpha=0.8, label=f'Mean: {mean_val:.1f}')
-                    axes[row, col].set_title(label)
-                    axes[row, col].set_xlabel('Value')
-                    axes[row, col].set_ylabel('Frequency')
-                    axes[row, col].legend()
-
-            plt.tight_layout()
-            plt.show()
-        except Exception as e:
-            logger.error(f"Error plotting HRV histogram: {e}")
-            print(f"Could not create histogram: {e}")
-
-    def plot_baselines(self, baselines: Dict[str, float], title: str = "HRV Baselines") -> None:
-        labels = list(baselines.keys())
-        values = [baselines[k] for k in labels]
-        plt.figure(figsize=(7,5))
-        sns.barplot(x=labels, y=values, palette="Set2")
+        plt.figure(figsize=(12,6))
+        plt.plot(df['date'], df['rmssd'], label='RMSSD', marker='o')
+        plt.plot(df['date'], df['sdnn'], label='SDNN', marker='s')
+        plt.plot(df['date'], df['pnn50'], label='pNN50', marker='^')
+        plt.plot(df['date'], df['simple_recovery'], label='Simple Recovery', marker='d')
         plt.title(title)
-        plt.ylabel("Baseline Value")
-        plt.xlabel("")
+        plt.ylabel('Value')
+        plt.legend()
+        plt.grid(True)
         plt.xticks(rotation=45)
-        plt.grid(axis='y')
+        plt.tight_layout()
         plt.show()
 
-    def plot_trend_summary(self, stats: Dict[str, Any], title: str = "Trend Statistics Summary") -> None:
-        # Plot correlation strengths and directions per metric
-        metrics = []
-        corr_vals = []
-        directions = []
-        for metric, stat in stats.items():
-            metrics.append(metric)
-            corr_vals.append(stat['correlation'])
-            directions.append(stat['trend_direction'])
+    def plot_hrv_histogram(self, df: pd.DataFrame, title: str = "HRV Metrics Distribution") -> None:
+        plt.figure(figsize=(14,6))
+        metrics = ['rmssd', 'sdnn', 'pnn50', 'simple_recovery']
+        for i, metric in enumerate(metrics, 1):
+            plt.subplot(1, 4, i)
+            plt.hist(df[metric], bins=15, color='steelblue', edgecolor='black')
+            plt.title(metric)
+            plt.axvline(df[metric].mean(), color='red', linestyle='--')
+        plt.suptitle(title)
+        plt.tight_layout()
+        plt.show()
 
+    def plot_baselines(self, baselines: dict, title: str = "HRV Baselines") -> None:
+        plt.figure(figsize=(6,4))
+        keys = list(baselines.keys())
+        vals = list(baselines.values())
+        sns.barplot(x=keys, y=vals, palette="Blues")
+        plt.title(title)
+        plt.ylabel("Baseline Value")
+        plt.grid(axis='y')
+        plt.tight_layout()
+        plt.show()
+
+    def plot_trend_summary(self, stats: dict, title: str = "Trend Statistics Summary") -> None:
+        metrics = list(stats.keys())
+        corr_vals = [stats[m]['correlation'] for m in metrics]
+        directions = [stats[m]['trend_direction'] for m in metrics]
         plt.figure(figsize=(8,5))
         bars = plt.bar(metrics, corr_vals, color='steelblue')
         plt.title(title)
         plt.ylabel('Correlation coefficient')
         plt.ylim(-1,1)
         plt.axhline(0, color='black', linewidth=0.8)
-        plt.xticks(rotation=45)
-
-        # Add text labels for direction above bars
         for bar, direction in zip(bars, directions):
             height = bar.get_height()
             plt.text(bar.get_x()+bar.get_width()/2, height, direction, ha='center', va='bottom')
-
         plt.grid(axis='y')
         plt.tight_layout()
         plt.show()
 
     def plot_latest_recovery_score(self, latest_score: float, title: str = "Latest Recovery Score") -> None:
-        plt.figure(figsize=(5,4))
-        plt.bar(['Latest Recovery Score'], [latest_score], color='orchid')
-        plt.ylim(0, 100)
+        plt.figure(figsize=(4,4))
+        plt.bar(['Latest Recovery'], [latest_score], color='orchid')
+        plt.ylim(0,100)
         plt.title(title)
         plt.ylabel('Score (0-100)')
         plt.grid(axis='y')
+        plt.tight_layout()
         plt.show()
 
 def main():
-    print("=== HRV Analytics Demo ===")
+    print("=== HRV Analytics V3.0 Demo ===")
     hrv = HRVAnalytics("c:/smakrykoDBs/Mercury_HRV.db")
-    print("\n1. Analyzing HRV trends...")
-    results = hrv.analyze_hrv_trends(days_back=30, include_stats=True)
+    hrv.import_f3b_view_to_hrv_data(source_view="f3bHRV_view", device_name="F3b_import")
+
+    print("\n1. Analyzing HRV trends for F3b_import...")
+    results = hrv.analyze_hrv_trends(days_back=30, source_name="F3b_import", include_stats=True)
     if "error" in results:
         print(f"Error: {results['error']}")
         return
@@ -482,34 +386,35 @@ def main():
     print("\nCurrent HRV values:")
     for metric, value in results['current_values'].items():
         print(f" {metric.upper()}: {value:.1f}")
+
     print("\nRecovery Scores:")
     for method, score in results['recovery_scores'].items():
         print(f" {method.capitalize()}: {score:.1f}/100")
 
-    if 'statistics' in results:
-        print("\nTrend Analysis:")
-        for metric, stat in results['statistics'].items():
-            if 'recovery' in metric:
-                print(f" {metric.replace('_', ' ').title()}: {stat['trend_direction']} ({stat['trend_strength']})")
-
-    print("\n2. Creating visualizations...")
-    df = results['dataframe']
-    hrv.plot_hrv_trend(df, "HRV Trends - Last 30 Days")
-    hrv.plot_hrv_histogram(df, "HRV Metrics Distribution")
-
-    baselines = hrv._get_personal_baselines("HRV")
-    hrv.plot_baselines(baselines, "Personal HRV Baselines (Last 90 Days)")
     stats = results.get('statistics', {})
     if stats:
-        hrv.plot_trend_summary(stats, "Trend Statistics Summary (Correlations & Directions)")
+        print("\nTrend Analysis:")
+        for metric, stat in stats.items():
+            print(f" {metric.title()}: {stat['trend_direction']} ({stat['trend_strength']})")
 
-    latest_score = results['recovery_scores'].get('personalized', None)
+    print("\n2. Creating visualizations...")
+
+    df = results['dataframe']
+    hrv.plot_hrv_trend(df, "F3b HRV Metrics & Recovery (Last 30 Days)")
+    hrv.plot_hrv_histogram(df, "F3b HRV Metrics Distribution (Last 30 Days)")
+
+    baselines = hrv._get_personal_baselines("F3b_import")
+    hrv.plot_baselines(baselines, "F3b Baseline HRV Profile (90 Days)")
+
+    if stats:
+        hrv.plot_trend_summary(stats, "F3b Trend Statistics Summary")
+    latest_score = results['recovery_scores'].get('simple')
     if latest_score is not None:
-        hrv.plot_latest_recovery_score(latest_score, "Latest Personalized Recovery Score")
+        hrv.plot_latest_recovery_score(latest_score, "F3b Latest Recovery Score")
 
-    # Save baseline and trends summaries into DB
-    hrv.save_baselines(baselines, "HRV")
-    hrv.save_trends(stats, latest_score, "HRV")
+    hrv.save_baselines(baselines, "F3b_import")
+    if stats:
+        hrv.save_trends(stats, latest_score, "F3b_import")
 
     print("\nDemo completed!")
 

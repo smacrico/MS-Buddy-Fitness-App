@@ -9,7 +9,7 @@ from fitparse import FitFile
 # --- Configuration ---
 
 # --- DB Name and Log Path --- 
-DB_PATH = "c:/smakrykoDBs/Mercury_HRV.db"
+DB_PATH = "c:/smakrykoDBs/Mercury_HRV-dev.db"
 LOG_PATH = "c:/temp/logsDWH/hrv_Mercury.log"
 
 # Setup logging
@@ -52,6 +52,7 @@ def create_unified_tables():
         session_hrv REAL,
         NN50 INTEGER,
         NN20 INTEGER,
+        rmssd REAL,
         sd1 REAL,
         sd2 REAL,
         lf REAL,
@@ -143,7 +144,7 @@ def ingest_fit_file(file_path, source_hint=None):
                 fields.get('rawHR'),
                 fields.get('RRint'),
                 fields.get('hrv'),
-                fields.get('rmssd'),
+                fields.get('RMSSD'),
                 fields.get('SDNN'),
                 fields.get('SaO2_C'),
                 fields.get('stress_hrp')
@@ -156,9 +157,9 @@ def ingest_fit_file(file_path, source_hint=None):
                 INSERT OR IGNORE INTO hrv_sessions (
                     activity_id, name, source, timestamp, sport, min_hr, hrv_rmssd, hrv_sdrr_f,
                     hrv_sdrr_l, hrv_pnn50, hrv_pnn20, armssd, asdnn, SaO2, trnd_hrv, recovery,
-                    sdnn, sdsd, dBeats, sBeats, session_hrv, NN50, NN20, sd1, sd2, lf, hf, vlf,
+                    sdnn, sdsd, dBeats, sBeats, session_hrv, NN50, NN20, rmssd, sd1, sd2, lf, hf, vlf,
                     pNN50, lf_nu, hf_nu, mean_hr, mean_rr, stress_hrpa, steps, distance, vo2max
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 activity_id,
                 name,
@@ -183,6 +184,7 @@ def ingest_fit_file(file_path, source_hint=None):
                 fields.get('session_hrv'),
                 fields.get('NN50'),
                 fields.get('NN20'),
+                fields.get('RMSSD'),
                 fields.get('SD1'),
                 fields.get('SD2'),
                 fields.get('LF'),
@@ -281,7 +283,7 @@ def establish_baseline(days=21):
     conn = sqlite3.connect(DB_PATH)
     query = """
     SELECT date(timestamp) as date, AVG(armssd) as avg_rmssd, 
-           AVG(asdnn) as avg_sdnn, AVG(pnn50) as avg_pnn50
+           AVG(asdnn) as avg_sdnn, AVG(nn50) as avg_nn50
     FROM hrv_sessions
     WHERE timestamp >= date('now', ?) AND armssd IS NOT NULL
     GROUP BY date(timestamp)
@@ -349,7 +351,7 @@ def detect_sustained_low_hrv(baseline, days=14, consecutive_days=3):
     query = """
     SELECT date(timestamp) as date, AVG(armssd) as avg_rmssd
     FROM hrv_sessions
-    WHERE timestamp >= date('now', ?) AND armssd IS NOT NULL
+    WHERE timestamp >= date('now', ?) AND hrv_rmssd IS NOT NULL
     GROUP BY date(timestamp)
     ORDER BY date(timestamp) ASC
     """
@@ -410,6 +412,7 @@ def calculate_hrv_7day_average():
     
     return df
 
+
 def detect_erratic_patterns(days=14):
     """Detect erratic HRV patterns (high variability)"""
     conn = sqlite3.connect(DB_PATH)
@@ -438,15 +441,14 @@ def detect_erratic_patterns(days=14):
     return erratic_days[['date', 'avg_rmssd', 'std_rmssd', 'cv']].to_dict('records')
 
 
-
-def detect_erratic_patternsOLDOLDOLD(days=14):
+def detect_erratic_patterns_OLDOLDOLD(days=14):
     """Detect erratic HRV patterns (high variability)"""
     conn = sqlite3.connect(DB_PATH)
     query = """
     SELECT date(timestamp) as date, AVG(armssd) as avg_rmssd,
            STDEV(armssd) as std_rmssd, COUNT(*) as readings
     FROM hrv_sessions
-    WHERE timestamp >= date('now', ?) AND armssd IS NOT NULL
+    WHERE timestamp >= date('now', ?) AND hrv_rmssd IS NOT NULL
     GROUP BY date(timestamp)
     HAVING COUNT(*) > 1
     ORDER BY date(timestamp) DESC
@@ -467,7 +469,7 @@ def detect_erratic_patternsOLDOLDOLD(days=14):
 
 def comprehensive_hrv_health_check():
     """Run comprehensive HRV health monitoring"""
-    print("=== HRV Health Monitoring Report ===")
+    print("=== HRV Health Monitoring Report v.2.0 ===")
     print(f"Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print()
     
