@@ -51,6 +51,19 @@ class HRVAnalyticsV33:
                     )
                 """)
                 cursor.execute(f"""
+                CREATE TABLE IF NOT EXISTS hrv_alerts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    alert_date TEXT NOT NULL,
+                    source_name TEXT NOT NULL,
+                    metric TEXT NOT NULL,
+                    current_value REAL,
+                    baseline_value REAL,
+                    deviation_pct REAL,
+                    alert_message TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+                cursor.execute(f"""
                     CREATE TABLE IF NOT EXISTS myHRV_baselines (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         source_name TEXT,
@@ -337,7 +350,52 @@ class HRVAnalyticsV33:
         plt.tight_layout()
         plt.show()
 
-    def report_alerts(seLF, latest, baselines, thresholds=None):
+    def report_alerts(seLF, latest, baselines, thresholds=None, source_name="MyHRV_import"):
+        if thresholds is None:
+            thresholds = {m: 2.5 for m in seLF.metrics}
+        alerts = []
+        
+        try:
+            with sqlite3.connect(seLF.db_path) as conn:
+                cursor = conn.cursor()
+                alert_date = datetime.now().strftime('%Y-%m-%d')
+                
+                for m in seLF.metrics:
+                    baseline = baselines.get(f"avg_{m}", 0.0)
+                    value = latest.get(m, 0.0)
+                    if baseline == 0:
+                        continue
+                        
+                    rel_dev = (value - baseline) / baseline
+                    if abs(rel_dev) >= thresholds.get(m, 2.5) / 10:  # ~25% deviation threshold
+                        alert_msg = f"{m.upper()} deviation: current={value:.1f}, baseline={baseline:.1f}, deviation={rel_dev * 100:.1f}%"
+                        alerts.append(alert_msg)
+                        
+                        # Log alert to database
+                        cursor.execute("""
+                            INSERT INTO hrv_alerts 
+                            (alert_date, source_name, metric, current_value, baseline_value, deviation_pct, alert_message)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """, (alert_date, source_name, m, value, baseline, rel_dev * 100, alert_msg))
+                
+                conn.commit()
+                
+        except sqlite3.Error as e:
+            logger.error(f"Error logging alerts to database: {e}")
+        
+        if alerts:
+            logger.warning("SIGNIFICANT HRV DEVIATION DETECTED:\n" + "\n".join(alerts))
+        else:
+            logger.info("No significant deviations from HRV baseline found.")
+    
+        return alerts
+
+
+
+
+
+
+    def report_alertsXXXX(seLF, latest, baselines, thresholds=None):
         if thresholds is None:
             thresholds = {m: 2.5 for m in seLF.metrics}
         alerts = []
