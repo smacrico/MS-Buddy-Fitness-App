@@ -19,7 +19,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
-from typing import Sequence, Optional, Tuple
+from typing import Sequence, Optional, Tuple, Dict, Any, Union
+import json
+import csv
+from pathlib import Path
 
 # Optional: frequency-domain HRV needs scipy.signal
 try:
@@ -442,6 +445,86 @@ def forecast_capacity_trend(capacity_series: Sequence[float],
 
 
 # ----------------------
+# --- Data Import Functions ---
+# ----------------------
+def import_csv_data(filepath: Union[str, Path]) -> pd.DataFrame:
+    """
+    Import health data from CSV file.
+    Expected columns: timestamp, heart_rate, rr_intervals, sleep_stage, etc.
+    Returns pandas DataFrame with standardized column names.
+    """
+    df = pd.read_csv(filepath)
+    # Validate required columns
+    required_cols = ['timestamp']
+    missing = [col for col in required_cols if col not in df.columns]
+    if missing:
+        raise ValueError(f"Missing required columns: {missing}")
+    
+    # Convert timestamp to datetime
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    return df
+
+def import_json_data(filepath: Union[str, Path]) -> Dict[str, Any]:
+    """
+    Import health data from JSON file.
+    Expected format: {
+        "user_info": {...},
+        "measurements": [{
+            "timestamp": "ISO8601",
+            "heart_rate": float,
+            "rr_intervals": [float, ...],
+            "sleep_stage": str,
+            ...
+        }]
+    }
+    """
+    with open(filepath, 'r') as f:
+        data = json.load(f)
+    
+    # Validate basic structure
+    if not isinstance(data, dict):
+        raise ValueError("JSON must contain a root object")
+    if "measurements" not in data:
+        raise ValueError("JSON must contain 'measurements' array")
+    
+    return data
+
+def preprocess_health_data(data: Union[pd.DataFrame, Dict[str, Any]]) -> pd.DataFrame:
+    """
+    Standardize and clean imported health data.
+    - Handles both CSV DataFrame and JSON dict inputs
+    - Normalizes column names
+    - Removes duplicates
+    - Sorts by timestamp
+    - Validates data types
+    Returns cleaned DataFrame
+    """
+    if isinstance(data, dict):
+        # Convert JSON format to DataFrame
+        df = pd.DataFrame(data['measurements'])
+    else:
+        df = data.copy()
+    
+    # Standardize column names
+    column_mapping = {
+        'heart_rate': 'heart_rate',
+        'hr': 'heart_rate',
+        'rr': 'rr_intervals',
+        'rr_intervals': 'rr_intervals',
+        'sleep': 'sleep_stage',
+        'sleep_stage': 'sleep_stage'
+    }
+    df.rename(columns=column_mapping, inplace=True)
+    
+    # Sort and remove duplicates
+    if 'timestamp' in df.columns:
+        df.sort_values('timestamp', inplace=True)
+        df.drop_duplicates(subset=['timestamp'], inplace=True)
+    
+    return df
+
+
+# ----------------------
 # --- Example / CLI ---
 # ----------------------
 if __name__ == "__main__":
@@ -497,3 +580,26 @@ if __name__ == "__main__":
     bio_age = compute_biological_age(chronological_age=40, resting_hr=60, rmssd_baseline=rmssd_baseline_mean,
                                      sleep_quality_avg=80.0, activity_level_score=60.0)
     print(f"Cardio health score: {cardio:.2f}, Biological age estimate: {bio_age:.2f} years")
+
+    # Data Import Example
+    print("\n=== Data Import Example ===")
+    # Example with synthetic data saved to CSV
+    example_df = pd.DataFrame({
+        'timestamp': pd.date_range(start='2023-01-01', periods=100, freq='1min'),
+        'heart_rate': np.random.normal(70, 5, 100),
+        'rr_intervals': [list(np.random.normal(850, 30, 5)) for _ in range(100)]
+    })
+    
+    # Save and reload to demonstrate import
+    temp_csv = 'example_health_data.csv'
+    example_df.to_csv(temp_csv, index=False)
+    
+    try:
+        loaded_df = import_csv_data(temp_csv)
+        processed_df = preprocess_health_data(loaded_df)
+        print(f"Successfully loaded {len(processed_df)} records")
+    finally:
+        # Cleanup
+        import os
+        if os.path.exists(temp_csv):
+            os.remove(temp_csv)
