@@ -12,8 +12,10 @@ load_dotenv() # Uncomment if you use a .env file
 HRV_DB_PATH = "c:/smakrykoDBs/Mercury_HRV.db"
 GARMIN_DB_PATH = "path/to/your/garmin_database.db" # This DB will hold both sleep/stress and activities
 
-activities_db = r'c:/users/jheel/jheelHealthData/DBs/garmin_activities.db'
-sleep_db = r'c:/users/jheel/jheelHealthData/DBs/garmin.db'
+#activities_db = r'c:/users/jheel/jheelHealthData/DBs/garmin_activities.db'
+activities_db = r'C:/Users/jheel/jheelHealthData/DBs/garmin_activities.db'
+# sleep_db = r'c:/users/jheel/jheelHealthData/DBs/garmin.db'
+sleep_db = r'C:/Users/jheel/jheelHealthData/DBs/garmin.db'
 summary_db = r'c:/users/jheel/jheelHealthData/DBs/garmin_summary.db'
 garmin_db = r'c:/users/jheel/jheelHealthData/DBs/garmin.db'
 
@@ -101,7 +103,7 @@ def fetch_hrv_data(db_path, target_date):
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT hrv, rmssd, sdnn FROM hrv_table WHERE date=?", (target_date.strftime("%Y-%m-%d"),))
+        cursor.execute("SELECT hrv, rmssd, sdnn FROM hrv_data WHERE date=?", (target_date.strftime("%Y-%m-%d"),))
         hrv_data = cursor.fetchone()
         if hrv_data:
             return {"hrv": hrv_data[0], "rmssd": hrv_data[1], "sdnn": hrv_data[2]}
