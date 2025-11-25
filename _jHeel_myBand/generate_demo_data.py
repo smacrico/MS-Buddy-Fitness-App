@@ -2,15 +2,22 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from pathlib import Path
+import argparse
 
-def generate_demo_data():
+def generate_demo_data(days=30, interval_minutes=30, output_file=None, start_date=None):
     # Get script directory
     script_dir = Path(__file__).parent
-    output_file = script_dir / 'demo.csv'
+    if output_file is None:
+        output_file = script_dir / 'demo.csv'
+    else:
+        output_file = Path(output_file)
     
-    # Generate 30 days of data with 48 readings per day (every 30 minutes)
-    start_date = datetime(2023, 12, 1)
-    dates = [start_date + timedelta(minutes=30*i) for i in range(30*48)]
+    # Generate data with specified parameters
+    if start_date is None:
+        start_date = datetime(2023, 12, 1)
+    
+    readings_per_day = (24 * 60) // interval_minutes
+    dates = [start_date + timedelta(minutes=interval_minutes*i) for i in range(days*readings_per_day)]
     
     data = []
     for date in dates:
@@ -74,6 +81,69 @@ def generate_demo_data():
     df.to_csv(output_file, index=False)
     print(f"Generated {len(df)} records of demo data")
     print(f"File saved at: {output_file}")
+    return output_file
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Generate demo health monitoring data for MS Buddy Fitness App',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=''',
+Examples:
+  python generate_demo_data.py
+  python generate_demo_data.py --days 60 --interval 15
+  python generate_demo_data.py --output custom_demo.csv --start-date 2024-01-01
+        '''
+    )
+    
+    parser.add_argument(
+        '--days',
+        type=int,
+        default=30,
+        help='Number of days to generate data for (default: 30)'
+    )
+    
+    parser.add_argument(
+        '--interval',
+        type=int,
+        default=30,
+        help='Interval between readings in minutes (default: 30)'
+    )
+    
+    parser.add_argument(
+        '--output',
+        type=str,
+        help='Output CSV file path (default: demo.csv in script directory)'
+    )
+    
+    parser.add_argument(
+        '--start-date',
+        type=str,
+        help='Start date in YYYY-MM-DD format (default: 2023-12-01)'
+    )
+    
+    args = parser.parse_args()
+    
+    # Parse start date if provided
+    start_date = None
+    if args.start_date:
+        try:
+            start_date = datetime.strptime(args.start_date, '%Y-%m-%d')
+        except ValueError:
+            print(f"Error: Invalid date format '{args.start_date}'. Use YYYY-MM-DD")
+            return 1
+    
+    # Generate the data
+    try:
+        generate_demo_data(
+            days=args.days,
+            interval_minutes=args.interval,
+            output_file=args.output,
+            start_date=start_date
+        )
+        return 0
+    except Exception as e:
+        print(f"Error generating data: {e}")
+        return 1
 
 if __name__ == "__main__":
-    generate_demo_data()
+    exit(main())
