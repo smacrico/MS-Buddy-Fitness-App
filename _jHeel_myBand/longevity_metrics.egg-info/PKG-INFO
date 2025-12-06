@@ -54,9 +54,52 @@ cd MS-Buddy-Fitness-App/_jHeel_myBand
 # Install dependencies
 pip install -r requirements.txt
 
-# Install package in development mode
+# Install package in development mode (optional)
 pip install -e .
 ```
+
+**Note:** If you only want to use the demo data generator, you can skip the `pip install -e .` step and just install the required dependencies:
+
+```bash
+pip install pandas numpy
+```
+
+### Troubleshooting Installation
+
+If `pip install -e .` fails:
+
+1. **Check Python version**: Requires Python 3.7 or higher
+   ```bash
+   python --version
+   ```
+
+2. **Upgrade pip and setuptools**:
+   ```bash
+   pip install --upgrade pip setuptools wheel
+   ```
+
+3. **Verify you're in the correct directory**:
+   ```bash
+   # Should contain setup.py
+   ls setup.py  # Linux/Mac
+   dir setup.py  # Windows
+   ```
+
+4. **Try installing without editable mode**:
+   ```bash
+   pip install .
+   ```
+
+5. **Use virtual environment (recommended)**:
+   ```bash
+   python -m venv venv
+   # Activate on Windows
+   venv\Scripts\activate
+   # Activate on Linux/Mac
+   source venv/bin/activate
+   # Then install
+   pip install -e .
+   ```
 
 ## Quick Start
 
