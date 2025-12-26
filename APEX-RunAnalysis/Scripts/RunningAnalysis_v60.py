@@ -599,6 +599,115 @@ class RunningAnalysis:
         plt.tight_layout()
         plt.show()
 
+    def calculate_monthly_metrics_averages(self):
+        """Calculate monthly averages for all metrics"""
+        try:
+            if self.training_log.empty:
+                print("No training data available for monthly averages.")
+                return None
+            
+            # Ensure date is datetime
+            df = self.training_log.copy()
+            df['date'] = pd.to_datetime(df['date'])
+            df['year_month'] = df['date'].dt.to_period('M')
+            
+            # Define metrics to average
+            metrics = [
+                'running_economy', 
+                'vo2max', 
+                'distance', 
+                'efficiency_score', 
+                'heart_rate',
+                'energy_cost',
+                'TRIMP'
+            ]
+            
+            # Add optional metrics if they exist
+            optional_metrics = ['recovery_score', 'readiness_score']
+            for metric in optional_metrics:
+                if metric in df.columns:
+                    metrics.append(metric)
+            
+            # Calculate monthly averages
+            monthly_averages = df.groupby('year_month')[metrics].agg(['mean', 'std', 'count'])
+            
+            return monthly_averages
+        
+        except Exception as e:
+            print(f"Error calculating monthly averages: {e}")
+            return None
+    
+    def print_monthly_metrics_averages(self):
+        """Print monthly averages for metrics breakdown"""
+        monthly_avg = self.calculate_monthly_metrics_averages()
+        
+        if monthly_avg is None or monthly_avg.empty:
+            return
+        
+        print("\n" + "="*80)
+        print("MONTHLY METRICS BREAKDOWN - AVERAGES")
+        print("="*80)
+        
+        for month in monthly_avg.index:
+            print(f"\n{month} ({int(monthly_avg.loc[month, ('running_economy', 'count')]} sessions)")
+            print("-" * 80)
+            
+            # Running Economy
+            if 'running_economy' in monthly_avg.columns.get_level_values(0):
+                re_mean = monthly_avg.loc[month, ('running_economy', 'mean')]
+                re_std = monthly_avg.loc[month, ('running_economy', 'std')]
+                print(f"Running Economy:     {re_mean:>8.2f} ± {re_std:>6.2f}")
+            
+            # VO2Max
+            if 'vo2max' in monthly_avg.columns.get_level_values(0):
+                vo2_mean = monthly_avg.loc[month, ('vo2max', 'mean')]
+                vo2_std = monthly_avg.loc[month, ('vo2max', 'std')]
+                print(f"VO2Max:              {vo2_mean:>8.2f} ± {vo2_std:>6.2f}")
+            
+            # Distance
+            if 'distance' in monthly_avg.columns.get_level_values(0):
+                dist_mean = monthly_avg.loc[month, ('distance', 'mean')]
+                dist_std = monthly_avg.loc[month, ('distance', 'std')]
+                print(f"Distance (km):       {dist_mean:>8.2f} ± {dist_std:>6.2f}")
+            
+            # Efficiency Score
+            if 'efficiency_score' in monthly_avg.columns.get_level_values(0):
+                eff_mean = monthly_avg.loc[month, ('efficiency_score', 'mean')]
+                eff_std = monthly_avg.loc[month, ('efficiency_score', 'std')]
+                print(f"Efficiency Score:    {eff_mean:>8.2f} ± {eff_std:>6.2f}")
+            
+            # Heart Rate
+            if 'heart_rate' in monthly_avg.columns.get_level_values(0):
+                hr_mean = monthly_avg.loc[month, ('heart_rate', 'mean')]
+                hr_std = monthly_avg.loc[month, ('heart_rate', 'std')]
+                print(f"Heart Rate (bpm):    {hr_mean:>8.2f} ± {hr_std:>6.2f}")
+            
+            # Energy Cost
+            if 'energy_cost' in monthly_avg.columns.get_level_values(0):
+                ec_mean = monthly_avg.loc[month, ('energy_cost', 'mean')]
+                ec_std = monthly_avg.loc[month, ('energy_cost', 'std')]
+                print(f"Energy Cost:         {ec_mean:>8.2f} ± {ec_std:>6.2f}")
+            
+            # TRIMP
+            if 'TRIMP' in monthly_avg.columns.get_level_values(0):
+                trimp_mean = monthly_avg.loc[month, ('TRIMP', 'mean')]
+                trimp_std = monthly_avg.loc[month, ('TRIMP', 'std')]
+                print(f"TRIMP:               {trimp_mean:>8.2f} ± {trimp_std:>6.2f}")
+            
+            # Recovery Score (if available)
+            if 'recovery_score' in monthly_avg.columns.get_level_values(0):
+                rec_mean = monthly_avg.loc[month, ('recovery_score', 'mean')]
+                rec_std = monthly_avg.loc[month, ('recovery_score', 'std')]
+                print(f"Recovery Score:      {rec_mean:>8.2f} ± {rec_std:>6.2f}")
+            
+            # Readiness Score (if available)
+            if 'readiness_score' in monthly_avg.columns.get_level_values(0):
+                ready_mean = monthly_avg.loc[month, ('readiness_score', 'mean')]
+                ready_std = monthly_avg.loc[month, ('readiness_score', 'std')]
+                print(f"Readiness Score:     {ready_mean:>8.2f} ± {ready_std:>6.2f}")
+        
+        print("\n" + "="*80)
+    
 def main():
     # Database path
     db_path = 'c:/smakrykoDBs/Apex.db'
@@ -643,7 +752,8 @@ def main():
     analysis.calculate_recovery_and_readiness()
     analysis.visualize_recovery_and_readiness()
 
-
+    # Print monthly metrics averages
+    analysis.print_monthly_metrics_averages()
 
     if training_score:
         print("\nTraining Score Analysis:")
