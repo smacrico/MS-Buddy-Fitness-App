@@ -14,7 +14,7 @@
 
 & C://Python313/python.exe "C:/smakrykoDev/GitHubRepos/MS-Buddy-Fitness-App/Apex-RunAnalysis/scripts/RunningAnalysis_v60.py"
 
-
+& C://Python313/python.exe "C:/smakrykoDev/GitHubRepos/MS-Buddy-Fitness-App/Apex-RunAnalysis/scripts/RunningAnalysis_v6.5.py"
     #interactive DashBoard - Run Analysis
    
     streamlit run scripts/app.py

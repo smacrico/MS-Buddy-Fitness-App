@@ -2,11 +2,11 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-from RunningAnalysis_v60 import RunningAnalysis
+from RunningAnalysis_v65 import RunningAnalysis
 
 @st.cache_data
 def get_analysis():
-    analysis = RunningAnalysis('g:/My Drive/Phoenix/DataBasesDev/Apex.db')
+    analysis = RunningAnalysis('c:/smakrykoDBs/Apex.db')
     # Add advanced metrics if methods exist (per previous instructions)
     if hasattr(analysis, "calculate_recovery_and_readiness"):
         analysis.calculate_recovery_and_readiness()
