@@ -7,6 +7,8 @@
 
 & C:/Python313/python.exe "C:/smakrykoDev/GitHubRepos/CG_jHeelFitnessProject/GarminParse_PlugIn/jHeel_plugin v5.1.py"
 
+& C:/Python313/python.exe "C:/smakrykoDev/GitHubRepos/MS-Buddy-Fitness-App/utilities-tools/jHeel_plugin v5.1.py"
+
 
 
 ## Run Analysis
