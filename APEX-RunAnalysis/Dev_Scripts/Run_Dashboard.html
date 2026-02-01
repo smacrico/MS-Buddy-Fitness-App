@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Running Analytics Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .timestamp {
+            background: rgba(255,255,255,0.2);
+            padding: 10px;
+            margin-top: 15px;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .dashboard-grid {
+            padding: 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 30px;
+        }
+
+        .chart-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .chart-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+        }
+
+        .chart-card h2 {
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            font-size: 1.3em;
+        }
+
+        .chart-card img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: opacity 0.3s ease;
+        }
+
+        .chart-card img:hover {
+            opacity: 0.9;
+        }
+
+        .controls {
+            padding: 20px 30px;
+            background: #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: transform 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .file-path {
+            background: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #555;
+            flex-grow: 1;
+            max-width: 600px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+            padding: 20px;
+        }
+
+        .modal-content {
+            margin: auto;
+            display: block;
+            max-width: 95%;
+            max-height: 95%;
+            object-fit: contain;
+        }
+
+        .close {
+            position: absolute;
+            top: 30px;
+            right: 50px;
+            color: #f1f1f1;
+            font-size: 50px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .close:hover {
+            color: #667eea;
+        }
+
+        .error-message {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            color: #856404;
+            padding: 15px;
+            margin: 20px 30px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 1.2em;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+
+            .file-path {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏃 Running Analytics Dashboard</h1>
+            <p>Comprehensive Running Performance Monitoring</p>
+            <div class="timestamp" id="lastUpdate">Loading dashboard...</div>
+        </div>
+
+        <div class="controls">
+            <div class="file-path">📁 C:\temp\logsFitnessApp\Run_DashBoards</div>
+            <button class="btn" onclick="selectFolder()">📂 Select Dashboard Folder</button>
+            <button class="btn" onclick="refreshDashboard()">🔄 Refresh Dashboard</button>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+
+        <div class="dashboard-grid" id="dashboardGrid">
+            <div class="loading">Click "Select Dashboard Folder" to load charts...</div>
+        </div>
+    </div>
+
+    <!-- Modal for full-screen image view -->
+    <div id="imageModal" class="modal" onclick="closeModal()">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <img class="modal-content" id="modalImage">
+    </div>
+
+    <script>
+        const IMAGE_DIR = 'C:/temp/logsFitnessApp/Run_DashBoards';
+        let directoryHandle = null;
+        let chartFiles = {};
+        
+        const chartTypes = [
+            { pattern: 'Run_TrainingLoad_', title: '💪 Training Load Analysis', description: 'TRIMP, acute/chronic load, and ACWR monitoring' },
+            { pattern: 'Run_Trends_', title: '📈 Performance Trends', description: 'Running economy, efficiency, and energy cost trends' },
+            { pattern: 'Run_RecoveryReadiness_', title: '🔋 Recovery & Readiness', description: 'Recovery and readiness scores over time' },
+            { pattern: 'Run_AdvancedMetrics_', title: '📊 Advanced Metrics', description: 'Comprehensive performance visualizations' },
+            { pattern: 'Run_ScoreImpact_', title: '🎯 Training Score Impact', description: 'Comparison of scoring calculations' },
+            { pattern: 'Run_SpeedMetrics_', title: '⚡ Speed Analysis', description: 'Speed trends, zones, and efficiency metrics' },
+            { pattern: 'Run_HRRSDeviation_', title: '❤️ HR-RS Deviation Index', description: 'Heart rate recovery stress analysis' },
+            { pattern: 'Run_PerformanceDashboard_', title: '🎨 Complete Performance Dashboard', description: 'All-in-one performance overview' }
+        ];
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        function openModal(imgSrc) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            modal.style.display = 'block';
+            modalImg.src = imgSrc;
+        }
+
+        function closeModal() {
+            document.getElementById('imageModal').style.display = 'none';
+        }
+
+        async function selectFolder() {
+            try {
+                directoryHandle = await window.showDirectoryPicker();
+                await loadChartsFromDirectory();
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    showError(`Error selecting folder: ${err.message}`);
+                }
+            }
+        }
+
+        async function loadChartsFromDirectory() {
+            if (!directoryHandle) {
+                showError('Please select the dashboard folder first using the "Select Dashboard Folder" button.');
+                return;
+            }
+
+            hideError();
+            chartFiles = {};
+
+            try {
+                // Read all PNG files from directory
+                for await (const entry of directoryHandle.values()) {
+                    if (entry.kind === 'file' && entry.name.endsWith('.png')) {
+                        // Match against chart patterns
+                        for (const chart of chartTypes) {
+                            if (entry.name.startsWith(chart.pattern)) {
+                                // Store the latest file for each pattern
+                                if (!chartFiles[chart.pattern] || entry.name > chartFiles[chart.pattern].name) {
+                                    chartFiles[chart.pattern] = entry;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                await displayCharts();
+            } catch (err) {
+                showError(`Error reading files: ${err.message}`);
+            }
+        }
+
+        async function displayCharts() {
+            const grid = document.getElementById('dashboardGrid');
+            grid.innerHTML = '';
+
+            // Update timestamp
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = 
+                `Last Updated: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
+
+            let chartsFound = 0;
+
+            // Create chart cards
+            for (const chart of chartTypes) {
+                const card = document.createElement('div');
+                card.className = 'chart-card';
+                
+                const title = document.createElement('h2');
+                title.textContent = chart.title;
+                
+                const description = document.createElement('p');
+                description.textContent = chart.description;
+                description.style.marginBottom = '15px';
+                description.style.color = '#666';
+                
+                card.appendChild(title);
+                card.appendChild(description);
+
+                // Check if we have a file for this pattern
+                if (chartFiles[chart.pattern]) {
+                    try {
+                        const file = await chartFiles[chart.pattern].getFile();
+                        const imageUrl = URL.createObjectURL(file);
+                        
+                        const img = document.createElement('img');
+                        img.src = imageUrl;
+                        img.alt = chart.title;
+                        img.onclick = function() {
+                            openModal(this.src);
+                        };
+                        
+                        const fileName = document.createElement('p');
+                        fileName.textContent = `📄 ${file.name}`;
+                        fileName.style.fontSize = '0.8em';
+                        fileName.style.color = '#999';
+                        fileName.style.marginTop = '10px';
+                        
+                        card.appendChild(img);
+                        card.appendChild(fileName);
+                        chartsFound++;
+                    } catch (err) {
+                        const placeholder = createPlaceholder(chart.pattern, `Error loading: ${err.message}`);
+                        card.appendChild(placeholder);
+                    }
+                } else {
+                    const placeholder = createPlaceholder(chart.pattern, 'No chart found - run Python analysis script');
+                    card.appendChild(placeholder);
+                }
+                
+                grid.appendChild(card);
+            }
+
+            if (chartsFound === 0) {
+                showError('No charts found. Please run the RunningAnalysis_v6.26-Dev.py script to generate charts.');
+            } else {
+                hideError();
+            }
+        }
+
+        function createPlaceholder(pattern, message) {
+            const placeholder = document.createElement('div');
+            placeholder.style.cssText = 'padding: 100px 20px; text-align: center; background: #e9ecef; border-radius: 8px; color: #6c757d;';
+            placeholder.innerHTML = `
+                <p style="font-size: 3em; margin-bottom: 10px;">📊</p>
+                <p>${message}</p>
+                <p style="font-size: 0.8em; margin-top: 10px;">Pattern: ${pattern}*.png</p>
+            `;
+            return placeholder;
+        }
+
+        function loadDashboard() {
+            hideError();
+            const grid = document.getElementById('dashboardGrid');
+            grid.innerHTML = '<div class="loading">Click "Select Dashboard Folder" to load charts...</div>';
+        }
+
+        function refreshDashboard() {
+            if (!directoryHandle) {
+                showError('Please select the dashboard folder first using the "Select Dashboard Folder" button.');
+                return;
+            }
+            loadChartsFromDirectory();
+        }
+
+        // Load dashboard on page load
+        window.onload = loadDashboard;
+
+        // Keyboard shortcut to close modal
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeModal();
+            }
+        });
+    </script>
+
+    <div style="padding: 20px 30px; background: #f8f9fa; text-align: center; color: #666; font-size: 0.9em;">
+        <p><strong>Note:</strong> This dashboard displays running analytics generated by RunningAnalysis_v6.26-Dev.py</p>
+        <p>Charts are automatically saved to: <code>C:\temp\logsFitnessApp\Run_DashBoards</code></p>
+        <p style="margin-top: 10px;">💡 <em>For best results, open this file in a modern web browser and run the Python analysis script to generate fresh data.</em></p>
+    </div>
+</body>
+</html>

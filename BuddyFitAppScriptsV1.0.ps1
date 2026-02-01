@@ -7,14 +7,21 @@
 
 & C:/Python313/python.exe "C:/smakrykoDev/GitHubRepos/CG_jHeelFitnessProject/GarminParse_PlugIn/jHeel_plugin v5.1.py"
 
+& C:/Python313/python.exe "C:/smakrykoDev/GitHubRepos/MS-Buddy-Fitness-App/utilities-tools/jHeel_plugin v5.1.py"
+
+& C:/Python313/python.exe "C:/smakrykoDev/GitHubRepos/MS-Buddy-Fitness-App/utilities-tools/jHeel_plugin v6.26.py"
+
 
 
 ## Run Analysis
 & C:/Python313/python.exe "C:/smakrykoDev/GitHubRepos/MS-Buddy-Fitness-App/Apex-RunAnalysis/scripts/createRunAnalDB.py"
+& C:/Python313/python.exe "C:/smakrykoDev/GitHubRepos/MS-Buddy-Fitness-App/Apex-RunAnalysis/scripts/createRunAnalDB - v6.26.py"
 
 & C://Python313/python.exe "C:/smakrykoDev/GitHubRepos/MS-Buddy-Fitness-App/Apex-RunAnalysis/scripts/RunningAnalysis_v60.py"
 
+& C://Python313/python.exe "C:/smakrykoDev/GitHubRepos/MS-Buddy-Fitness-App/Apex-RunAnalysis/scripts/RunningAnalysis_v6.5.py"
 
+& C://Python313/python.exe "C:/smakrykoDev/GitHubRepos/MS-Buddy-Fitness-App/Apex-RunAnalysis/scripts/RunningAnalysis_v6.26 .py"
     #interactive DashBoard - Run Analysis
    
     streamlit run scripts/app.py
