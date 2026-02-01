@@ -1,3 +1,19 @@
+Metadata-Version: 2.1
+Name: longevity-metrics
+Version: 0.1.0
+Summary: Compute health metrics from wearable device data
+Author: MS Buddy Fitness Team
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+Requires-Dist: pandas>=1.3.0
+Requires-Dist: numpy>=1.21.0
+Requires-Dist: matplotlib>=3.4.0
+Requires-Dist: scipy>=1.7.0
+Provides-Extra: dev
+Requires-Dist: pytest>=6.0; extra == "dev"
+Requires-Dist: pytest-cov>=2.0; extra == "dev"
+Requires-Dist: jupyter>=1.0; extra == "dev"
+
 # Longevity Metrics
 
 A comprehensive Python package for computing health and longevity metrics from wearable device data (fitness trackers, smartwatches, etc.).

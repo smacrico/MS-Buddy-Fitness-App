@@ -1,0 +1,2 @@
+[console_scripts]
+longevity = longevity.cli:main
