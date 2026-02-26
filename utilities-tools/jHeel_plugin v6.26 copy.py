@@ -333,7 +333,7 @@ if __name__ == "__main__":
     create_view_if_not_exists()
     # all_session_data = parse_all_fit_files_in_folder(r'C:/SmakrykoDev/GitHubRepos/MS-Buddy-Fitness-App/utilities-tools/fit_test_files')
     # # all_session_data = parse_all_fit_files_in_folder(r'C:/smakryko/MS-Buddy-Fitness-App/utilities-tools/fit_test_files')
-    all_session_data = parse_all_fit_files_in_folder('c:/users/jheel/jheelhealthdata/fitfiles/activities')
+    all_session_data = parse_all_fit_files_in_folder('c:/users/djsco3/jheelHealtData/fitfiles/activities')
     insert_data_into_db(all_session_data)
     logging.info('All data inserted successfully.')
     print('All data inserted successfully.')
