@@ -39,6 +39,10 @@ K = float(os.environ.get("ALERT_K", "2.0"))
 COOLDOWN_HOURS = int(os.environ.get("ALERT_COOLDOWN_HOURS", "24"))
 STATE_PATH = os.environ.get("ALERT_STATE_PATH", "alerts_state.json")
 
+# DB_PATH = os.environ.get("GARMIN_ACTIVITIES_DB", r"C:\Users\XP222SP\myHealthData\DBs\garmin_activities.db")
+# OUTPUT_DIR = os.environ.get("GARMIN_OUTPUT_DIR", r"c:\temp\garminHealthMetrics")
+# C:\smakrykoDBs\artemis.db
+
 SLACK_WEBHOOK = os.environ.get("SLACK_WEBHOOK_URL", None)
 
 SMTP_HOST = os.environ.get("ALERT_SMTP_HOST")
@@ -51,7 +55,8 @@ ALERT_TO = os.environ.get("ALERT_TO_EMAIL")  # comma separated
 MIN_SAMPLES = int(os.environ.get("ALERT_MIN_SAMPLES", "8"))
 
 # DB path for logging alerts: prefer explicit ALERT_DB_PATH, else GARMIN_ACTIVITIES_DB, else default
-ALERT_DB_PATH = os.environ.get("ALERT_DB_PATH") or os.environ.get("GARMIN_ACTIVITIES_DB") or "garmin_activities.db"
+## ALERT_DB_PATH = os.environ.get("C:\smakrykoDBs\artemis.db") or os.environ.get("GARMIN_ACTIVITIES_DB") or "garmin_activities.db"
+ALERT_DB_PATH = os.environ.get("ARTEMIS", r"C:\smakrykoDBs\artemis.db")
 
 # create alert_logs table if not exists
 def ensure_alert_table(db_path=ALERT_DB_PATH):
@@ -343,3 +348,10 @@ def alert_on_metrics(metrics_dir="outputs", lookback=LOOKBACK, k=K):
 
     return alerts_sent
 # -------------------------
+
+# Initialize database table on module import
+try:
+    ensure_alert_table()
+    print("[INFO] Alert database table initialized.")
+except Exception as e:
+    print(f"[WARN] Could not initialize alert database table: {e}")

@@ -10,10 +10,18 @@
 
 & C:/Python313/python.exe "C:/smakrykoDev/GitHub_dls/MS-Buddy-Fitness-App/utilities-tools/jHeel_plugin v6.26.py"
 
+& C:/Python313/python.exe "C:/smakrykoDev/GitHub_dls/MS-Buddy-Fitness-App/Apex-RunAnalysis/scripts/createRunAnalDB - v6.26.py"
+& C:/Python313/python.exe c:/smakrykoDev/GitHub_dls/MS-Buddy-Fitness-App/APEX-RunAnalysis/Dev_Scripts/RunningAnalysis_v6.26-Dev.py 
+
+& C:/Python313/python.exe c:/smakrykoDev/GitHub_dls/MS-Buddy-Fitness-App/Mercury-HRVAnalysis/Dev_Scripts/HRV_Analytics_v6.25-DEV.py
+
+
+
+
 
 ## Run Analysis
 & C:/Python313/python.exe "C:/smakrykoDev/GitHub_dls/MS-Buddy-Fitness-App/Apex-RunAnalysis/scripts/createRunAnalDB.py"
-& C:/Python313/python.exe "C:/smakrykoDev/GitHub_dls/MS-Buddy-Fitness-App/Apex-RunAnalysis/scripts/createRunAnalDB - v6.26.py"
+
 
 
 

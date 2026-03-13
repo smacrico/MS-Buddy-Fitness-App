@@ -20,8 +20,8 @@ except Exception:
 # ------------------------------
 # Configuration
 # ------------------------------
-DB_PATH = os.environ.get("GARMIN_ACTIVITIES_DB", "garmin_activities.db")
-OUTPUT_DIR = os.environ.get("GARMIN_OUTPUT_DIR", "outputs")
+DB_PATH = os.environ.get("GARMIN_ACTIVITIES_DB", r"C:\Users\XP222SP\myHealthData\DBs\garmin_activities.db")
+OUTPUT_DIR = os.environ.get("GARMIN_OUTPUT_DIR", r"c:\temp\garminHealthMetrics")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 PLOTS_DIR = os.path.join(OUTPUT_DIR, "plots")
 os.makedirs(PLOTS_DIR, exist_ok=True)
@@ -34,7 +34,7 @@ QUERIES = {
         SELECT sport,
                strftime('%Y-%W', start_time) AS week,
                SUM(distance) AS total_distance_m,
-               SUM(duration) AS total_duration_s,
+               SUM(elapsed_time) AS total_duration_s,
                SUM(calories) AS total_calories
         FROM activities
         GROUP BY sport, week
@@ -42,16 +42,16 @@ QUERIES = {
     ''',
     "cardio_efficiency": '''
         SELECT activity_id, sport,
-               CASE WHEN duration > 0 THEN (distance / duration) ELSE NULL END AS pace_m_per_s,
+               CASE WHEN elapsed_time > 0 THEN (distance / elapsed_time) ELSE NULL END AS pace_m_per_s,
                avg_hr
         FROM activities
-        WHERE duration > 0 AND avg_hr IS NOT NULL AND distance IS NOT NULL;
+        WHERE elapsed_time > 0 AND avg_hr IS NOT NULL AND distance IS NOT NULL;
     ''',
     "pacing_consistency": '''
         SELECT activity_id,
-               AVG(CASE WHEN lap_elapsed_time > 0 THEN lap_distance / lap_elapsed_time END) AS avg_lap_pace,
-               (MAX(CASE WHEN lap_elapsed_time > 0 THEN lap_distance / lap_elapsed_time END) - 
-                MIN(CASE WHEN lap_elapsed_time > 0 THEN lap_distance / lap_elapsed_time END)) AS pace_variance
+               AVG(CASE WHEN elapsed_time > 0 THEN distance / elapsed_time END) AS avg_lap_pace,
+               (MAX(CASE WHEN elapsed_time > 0 THEN distance / elapsed_time END) - 
+                MIN(CASE WHEN elapsed_time > 0 THEN distance / elapsed_time END)) AS pace_variance
         FROM activity_laps
         GROUP BY activity_id;
     ''',
@@ -64,28 +64,28 @@ QUERIES = {
             GROUP BY activity_id
         )
         SELECT r.activity_id,
-               AVG(CASE WHEN r.timestamp < q.start_ts + 0.25 * (q.end_ts - q.start_ts) THEN r.heart_rate END) AS early_avg_hr,
-               AVG(CASE WHEN r.timestamp > q.start_ts + 0.75 * (q.end_ts - q.start_ts) THEN r.heart_rate END) AS late_avg_hr,
-               (AVG(CASE WHEN r.timestamp > q.start_ts + 0.75 * (q.end_ts - q.start_ts) THEN r.heart_rate END) -
-                AVG(CASE WHEN r.timestamp < q.start_ts + 0.25 * (q.end_ts - q.start_ts) THEN r.heart_rate END)) AS hr_drift
+               AVG(CASE WHEN r.timestamp < q.start_ts + 0.25 * (q.end_ts - q.start_ts) THEN r.hr END) AS early_avg_hr,
+               AVG(CASE WHEN r.timestamp > q.start_ts + 0.75 * (q.end_ts - q.start_ts) THEN r.hr END) AS late_avg_hr,
+               (AVG(CASE WHEN r.timestamp > q.start_ts + 0.75 * (q.end_ts - q.start_ts) THEN r.hr END) -
+                AVG(CASE WHEN r.timestamp < q.start_ts + 0.25 * (q.end_ts - q.start_ts) THEN r.hr END)) AS hr_drift
         FROM activity_records r
         JOIN quartiles q ON r.activity_id = q.activity_id
         GROUP BY r.activity_id;
     ''',
     "gait_stability": '''
         SELECT activity_id,
-               AVG(stride_length) AS avg_stride_length,
-               (MAX(stride_length) - MIN(stride_length)) AS stride_range
+               AVG(avg_step_length) AS avg_stride_length,
+               (MAX(avg_step_length) - MIN(avg_step_length)) AS stride_range
         FROM steps_activities
-        WHERE stride_length IS NOT NULL
+        WHERE avg_step_length IS NOT NULL
         GROUP BY activity_id;
     ''',
     "fatigue_indicators": '''
         SELECT activity_id,
-               AVG(ground_contact_time) AS avg_gct,
-               (MAX(ground_contact_time) - MIN(ground_contact_time)) AS gct_drift
+               AVG(avg_ground_contact_time) AS avg_gct,
+               (MAX(avg_ground_contact_time) - MIN(avg_ground_contact_time)) AS gct_drift
         FROM steps_activities
-        WHERE ground_contact_time IS NOT NULL
+        WHERE avg_ground_contact_time IS NOT NULL
         GROUP BY activity_id;
     '''
 }
