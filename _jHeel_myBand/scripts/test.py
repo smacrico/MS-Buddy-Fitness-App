@@ -2,7 +2,7 @@
 import pandas as pd
 
 # Load the demo data
-df = pd.read_csv('demo.csv')
+df = pd.read_csv('custom_demo.csv')
 
 # Parse timestamp column
 df['timestamp'] = pd.to_datetime(df['timestamp'])
