@@ -24,7 +24,7 @@
 
 ## Run Analysis
 & C:/Python313/python.exe "C:/smakrykoDev/GitHub_dls/MS-Buddy-Fitness-App/Apex-RunAnalysis/scripts/createRunAnalDB.py"
-& C:/Python313/python.exe "C:/smakrykoDev/GitHub_dls/MS-Buddy-Fitness-App/Apex-RunAnalysis/scripts/createRunAnalDB - v6.26.py"
+
 
 
 
