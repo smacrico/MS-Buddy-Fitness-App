@@ -288,3 +288,5 @@ Measures the relationship between heart rate and running speed. Increasing devia
 **Database Location**: `c:/smakrykoDBs/Apex.db`  
 **Output Directory**: `c:/temp/logsFitnessApp/`  
 **Current Version**: RunningAnalysis_v6.26.py
+
+# #################################################

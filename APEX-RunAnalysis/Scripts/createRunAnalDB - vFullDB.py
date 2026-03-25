@@ -1,14 +1,11 @@
 ############### create RunningAnalysis database in Production environment
 # dev 4.0 - fixed statments for training score and training log
-# Modified to filter by current year only
+# 
 # 
 # 
 import sqlite3
 import sys
-from datetime import datetime
 
-# Get current year
-CURRENT_YEAR = datetime.now().year
 
 def create_table_if_not_exists():
     conn = sqlite3.connect(r'c:/smakrykoDBs/Apex.db')
@@ -48,9 +45,7 @@ try:
     cursor_running_analysis = conn_running_analysis.cursor()
     
     # Select the specific columns from Artemis database joined with GarminDB activities
-    # Filtering for current year activities only
-    print(f"[INFO] Loading activities from year {CURRENT_YEAR} only...")
-    cursor_artemis.execute(f'''
+    cursor_artemis.execute('''
         SELECT 
             a.running_economy, 
             a.timestamp, 
@@ -65,26 +60,20 @@ try:
             a.HR_RS_Deviation_Index
         FROM Artemistbl_fields a
         INNER JOIN activities g ON a.activity_id = g.activity_id
-        WHERE a.sport LIKE 'running'
-        AND strftime('%Y', a.timestamp) = '{CURRENT_YEAR}'
+        WHERE a.sport like 'running'
     ''')
 
     # Fetch all the rows
     rows = cursor_artemis.fetchall()
-    row_count = len(rows)
 
     # Insert the data into running_session table in RunningAnalysis database
-    if row_count > 0:
-        cursor_running_analysis.executemany('''
-            INSERT INTO running_sessions (running_economy, date, distance, sport, vo2max,  cardiacdrift, heart_rate, time, avg_speed, max_speed, HR_RS_Deviation_Index)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)
-        ''', rows)
+    cursor_running_analysis.executemany('''
+        INSERT INTO running_sessions (running_economy, date, distance, sport, vo2max,  cardiacdrift, heart_rate, time, avg_speed, max_speed, HR_RS_Deviation_Index)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)
+    ''', rows)
 
-        # Commit the changes
-        conn_running_analysis.commit()
-        print(f"[SUCCESS] Imported {row_count} running sessions from {CURRENT_YEAR}")
-    else:
-        print(f"[WARNING] No running activities found for year {CURRENT_YEAR}")
+    # Commit the changes
+    conn_running_analysis.commit()
 
 except sqlite3.Error as e:
     print(f"An error occurred: {e}")
@@ -100,5 +89,4 @@ finally:
     if conn_running_analysis:
         conn_running_analysis.close()
 
-print(f"[INFO] Data transfer completed for year {CURRENT_YEAR}!")
-print(f"[INFO] Database path: c:/smakrykoDBs/Apex.db")
+print("Data transfer completed successfully!")
