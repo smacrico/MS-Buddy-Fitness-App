@@ -6,7 +6,7 @@
 & C:/Python313/python.exe C:/Python313/Scripts/garmindb_cli.py --all --download --import --analyze --latest
 
 ##Stelios laptop - jHeel ##
-& C:/Python313/python.exe C:/Users/djsco/AppData/Roaming/Python/Python313/Scripts/garmindb_cli.py --all --download --import --analyze --latest
+& C:/Python314/python.exe C:/Users/djsco/AppData/Roaming/Python/Python314/Scripts/garmindb_cli.py --all --download --import --analyze --latest
 
 & C:/Python313/python.exe "C:/smakrykoDev/GitHub_dls/MS-Buddy-Fitness-App/utilities-tools/jHeel_plugin v6.26.py"
 & C:/Python313/python.exe "C:/smakrykoDev/GitHub_dls/MS-Buddy-Fitness-App/Apex-RunAnalysis/scripts/createRunAnalDB - v6.26.py"

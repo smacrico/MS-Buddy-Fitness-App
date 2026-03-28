@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-from RunningAnalysis_v65 import RunningAnalysis
+from RunningAnalysis_v6_26 import RunningAnalysis
 
 @st.cache_data
 def get_analysis():

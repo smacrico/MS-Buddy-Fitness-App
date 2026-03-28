@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HRV Platform Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background: #f5f7fb; color: #1f2937; }
+        .wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
+        .hero { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,.08); margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 20px; }
+        .card { background: white; border-radius: 12px; padding: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+        table { width: 100%; border-collapse: collapse; }
+        td, th { padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: top; }
+        .small { color: #6b7280; font-size: 0.92rem; }
+        .live { font-weight: bold; }
+        .ok { color: #047857; }
+        .warn { color: #b45309; }
+        .bad { color: #b91c1c; }
+        code { background: #eef2ff; padding: 2px 6px; border-radius: 6px; }
+        pre { white-space: pre-wrap; word-break: break-word; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="hero">
+        <h1>HRV Platform Dashboard</h1>
+        <p class="small">API-driven dashboard with real-time ingestion, regression-based trends, and anomaly detection.</p>
+        <p>Status: <span id="live" class="live warn">connecting…</span></p>
+    </div>
+
+    <div class="grid">
+        <div class="card"><h3>Data points</h3><div id="dataPoints">-</div></div>
+        <div class="card"><h3>MS score</h3><div id="msScore">-</div></div>
+        <div class="card"><h3>Date range</h3><div id="dateRange">-</div></div>
+        <div class="card"><h3>Alert count</h3><div id="alertCount">-</div></div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h3>Current values</h3>
+            <pre id="currentValues"></pre>
+        </div>
+        <div class="card">
+            <h3>Baselines</h3>
+            <pre id="baselines"></pre>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Trend analysis</h3>
+        <table id="trendsTable">
+            <thead><tr><th>Metric</th><th>Slope</th><th>R</th><th>P</th><th>Direction</th><th>Strength</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+        <h3>Recent anomalies</h3>
+        <table id="anomalyTable">
+            <thead><tr><th>Date</th><th>Metric</th><th>Value</th><th>Z-score</th><th>Message</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+async function loadSummary() {
+  const res = await fetch('/api/summary');
+  const data = await res.json();
+  document.getElementById('dataPoints').textContent = data.data_points;
+  document.getElementById('msScore').textContent = data.recovery_scores.ms;
+  document.getElementById('dateRange').textContent = `${data.date_range.start ?? '-'} → ${data.date_range.end ?? '-'}`;
+  document.getElementById('alertCount').textContent = data.alerts.length;
+  document.getElementById('currentValues').textContent = JSON.stringify(data.current_values, null, 2);
+  document.getElementById('baselines').textContent = JSON.stringify(data.baselines, null, 2);
+}
+
+async function loadTrends() {
+  const res = await fetch('/api/trends');
+  const data = await res.json();
+  const tbody = document.querySelector('#trendsTable tbody');
+  tbody.innerHTML = '';
+  data.forEach(item => {
+    const row = document.createElement('tr');
+    row.innerHTML = `<td>${item.metric}</td><td>${item.slope.toFixed(4)}</td><td>${item.r_value.toFixed(4)}</td><td>${item.p_value.toFixed(4)}</td><td>${item.trend_direction}</td><td>${item.trend_strength}</td>`;
+    tbody.appendChild(row);
+  });
+}
+
+async function loadAnomalies() {
+  const res = await fetch('/api/anomalies');
+  const data = await res.json();
+  const tbody = document.querySelector('#anomalyTable tbody');
+  tbody.innerHTML = '';
+  data.forEach(item => {
+    const row = document.createElement('tr');
+    row.innerHTML = `<td>${item.measurement_date}</td><td>${item.metric}</td><td>${item.value}</td><td>${item.z_score.toFixed(2)}</td><td>${item.message}</td>`;
+    tbody.appendChild(row);
+  });
+}
+
+function connectLive() {
+  const status = document.getElementById('live');
+  const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${protocol}://${location.host}/ws/live`);
+  ws.onopen = () => { status.textContent = 'live'; status.className = 'live ok'; };
+  ws.onclose = () => { status.textContent = 'disconnected'; status.className = 'live bad'; setTimeout(connectLive, 1500); };
+  ws.onmessage = async (event) => {
+    const message = JSON.parse(event.data);
+    if (message.type === 'summary_updated' || message.type === 'measurement_ingested' || message.type === 'batch_ingested') {
+      await Promise.all([loadSummary(), loadTrends(), loadAnomalies()]);
+    }
+  };
+}
+
+Promise.all([loadSummary(), loadTrends(), loadAnomalies()]).then(connectLive);
+</script>
+</body>
+</html>

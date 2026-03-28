@@ -1,0 +1,2 @@
+[console_scripts]
+hrv-platform = hrv_platform.cli:main

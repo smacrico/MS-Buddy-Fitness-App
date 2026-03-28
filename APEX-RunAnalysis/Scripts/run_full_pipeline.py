@@ -24,6 +24,7 @@ import time
 from pathlib import Path
 from datetime import datetime
 
+
 # Get the current script directory
 SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
@@ -79,7 +80,7 @@ class RunningAnalysisPipeline:
         
         required_files = {
             'data_loader': 'createRunAnalDB - v6.26.py',
-            'analysis_module': 'RunningAnalysis_v6.26.py',
+            'analysis_module': 'RunningAnalysis_v6_26.py',
             'dashboard': 'app.py',
         }
         
@@ -97,7 +98,7 @@ class RunningAnalysisPipeline:
             return False
         
         # Check Python dependencies
-        required_packages = ['pandas', 'numpy', 'sqlite3', 'streamlit']
+        required_packages = ['pandas', 'numpy', 'sqlite3', 'streamlit', 'matplotlib']
         missing_packages = []
         
         for package in required_packages:

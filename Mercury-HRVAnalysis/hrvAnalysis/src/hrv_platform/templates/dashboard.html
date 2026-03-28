@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HRV Platform Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background: #f5f7fb; color: #1f2937; }
+        .wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
+        .hero, .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+        .hero { margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 20px; }
+        .card { padding: 16px; }
+        table { width: 100%; border-collapse: collapse; }
+        td, th { padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: top; }
+        .small { color: #6b7280; font-size: 0.92rem; }
+        .live { font-weight: bold; }
+        .ok { color: #047857; }
+        .warn { color: #b45309; }
+        .bad { color: #b91c1c; }
+        .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+        .toolbar input { padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 8px; min-width: 220px; }
+        .toolbar button {
+            padding: 9px 14px; border: 0; border-radius: 8px; cursor: pointer;
+            background: #2563eb; color: white; font-weight: 600;
+        }
+        .toolbar button.secondary { background: #6b7280; }
+        .message { margin-top: 12px; font-size: 0.95rem; }
+        .hidden { display: none; }
+        code { background: #eef2ff; padding: 2px 6px; border-radius: 6px; }
+        pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="hero">
+        <h1>HRV Platform Dashboard</h1>
+        <p class="small">API-driven dashboard with real-time ingestion, regression-based trends, persisted baselines, alerts, and anomaly detection.</p>
+        <p>Status: <span id="live" class="live warn">connecting…</span></p>
+
+        <div class="toolbar">
+            <label>
+                <span class="small">Source name</span><br>
+                <input id="sourceName" value="MyHRV_import">
+            </label>
+            <button id="refreshBtn">Refresh</button>
+            <button id="syncBtn">Sync from Artemis</button>
+            <button id="previewBtn" class="secondary">Preview Artemis</button>
+        </div>
+
+        <div id="message" class="message small"></div>
+    </div>
+
+    <div class="grid">
+        <div class="card"><h3>Data points</h3><div id="dataPoints">-</div></div>
+        <div class="card"><h3>MS score</h3><div id="msScore">-</div></div>
+        <div class="card"><h3>Date range</h3><div id="dateRange">-</div></div>
+        <div class="card"><h3>Alert count</h3><div id="alertCount">-</div></div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h3>Current values</h3>
+            <pre id="currentValues">-</pre>
+        </div>
+        <div class="card">
+            <h3>Baselines</h3>
+            <pre id="baselines">-</pre>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Trend analysis</h3>
+        <table id="trendsTable">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Slope</th>
+                    <th>R</th>
+                    <th>P</th>
+                    <th>Direction</th>
+                    <th>Strength</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+        <h3>Recent anomalies</h3>
+        <table id="anomalyTable">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Metric</th>
+                    <th>Value</th>
+                    <th>Z-score</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function getSourceName() {
+  return document.getElementById('sourceName').value.trim() || 'MyHRV_import';
+}
+
+function setMessage(text, kind = 'small') {
+  const el = document.getElementById('message');
+  el.textContent = text || '';
+  el.className = `message ${kind}`;
+}
+
+async function fetchJson(url, options = {}) {
+  const res = await fetch(url, options);
+  let body = null;
+  try {
+    body = await res.json();
+  } catch (_) {
+    body = null;
+  }
+
+  if (!res.ok) {
+    const detail = body?.detail || `HTTP ${res.status}`;
+    throw new Error(detail);
+  }
+
+  return body;
+}
+
+async function loadSummary() {
+  const sourceName = encodeURIComponent(getSourceName());
+  const data = await fetchJson(`/api/summary?source_name=${sourceName}`);
+
+  document.getElementById('dataPoints').textContent = data.data_points ?? '-';
+  document.getElementById('msScore').textContent = data.recovery_scores?.ms ?? '-';
+  document.getElementById('dateRange').textContent =
+    `${data.date_range?.start ?? '-'} → ${data.date_range?.end ?? '-'}`;
+  document.getElementById('alertCount').textContent = Array.isArray(data.alerts) ? data.alerts.length : 0;
+  document.getElementById('currentValues').textContent = JSON.stringify(data.current_values ?? {}, null, 2);
+  document.getElementById('baselines').textContent = JSON.stringify(data.baselines ?? {}, null, 2);
+}
+
+async function loadTrends() {
+  const sourceName = encodeURIComponent(getSourceName());
+  const data = await fetchJson(`/api/trends?source_name=${sourceName}`);
+  const tbody = document.querySelector('#trendsTable tbody');
+  tbody.innerHTML = '';
+
+  for (const item of data) {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${item.metric ?? ''}</td>
+      <td>${Number(item.slope ?? 0).toFixed(4)}</td>
+      <td>${Number(item.r_value ?? 0).toFixed(4)}</td>
+      <td>${Number(item.p_value ?? 0).toFixed(4)}</td>
+      <td>${item.trend_direction ?? ''}</td>
+      <td>${item.trend_strength ?? ''}</td>
+    `;
+    tbody.appendChild(row);
+  }
+}
+
+async function loadAnomalies() {
+  const sourceName = encodeURIComponent(getSourceName());
+  const data = await fetchJson(`/api/anomalies?source_name=${sourceName}`);
+  const tbody = document.querySelector('#anomalyTable tbody');
+  tbody.innerHTML = '';
+
+  for (const item of data) {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${item.measurement_date ?? ''}</td>
+      <td>${item.metric ?? ''}</td>
+      <td>${Number(item.value ?? 0).toFixed(2)}</td>
+      <td>${Number(item.z_score ?? 0).toFixed(2)}</td>
+      <td>${item.message ?? ''}</td>
+    `;
+    tbody.appendChild(row);
+  }
+}
+
+async function refreshAll() {
+  try {
+    setMessage('Loading data...', 'message small');
+    await Promise.all([loadSummary(), loadTrends(), loadAnomalies()]);
+    setMessage('Dashboard updated.', 'message small ok');
+  } catch (err) {
+    setMessage(`Load failed: ${err.message}`, 'message bad');
+    throw err;
+  }
+}
+
+async function syncArtemis() {
+  const sourceName = encodeURIComponent(getSourceName());
+  try {
+    setMessage('Syncing Artemis...', 'message small');
+    const data = await fetchJson(`/api/import/artemis?source_name=${sourceName}`, {
+      method: 'POST'
+    });
+    setMessage(`Sync complete. Rows imported: ${data.rows_synced}`, 'message ok');
+    await refreshAll();
+  } catch (err) {
+    setMessage(`Sync failed: ${err.message}`, 'message bad');
+  }
+}
+
+async function previewArtemis() {
+  try {
+    const data = await fetchJson('/api/import/artemis/preview');
+    setMessage(
+      `Preview ok. View=${data.source_view}, rows=${data.row_count}, columns=${(data.columns || []).join(', ')}`,
+      'message small'
+    );
+  } catch (err) {
+    setMessage(`Preview failed: ${err.message}`, 'message bad');
+  }
+}
+
+function connectLive() {
+  const status = document.getElementById('live');
+  const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${protocol}://${location.host}/ws/live`);
+
+  ws.onopen = () => {
+    status.textContent = 'live';
+    status.className = 'live ok';
+  };
+
+  ws.onclose = () => {
+    status.textContent = 'disconnected';
+    status.className = 'live bad';
+    setTimeout(connectLive, 1500);
+  };
+
+  ws.onerror = () => {
+    status.textContent = 'socket error';
+    status.className = 'live bad';
+  };
+
+  ws.onmessage = async (event) => {
+    const message = JSON.parse(event.data);
+
+    if (
+      message.type === 'summary_updated' ||
+      message.type === 'measurement_ingested' ||
+      message.type === 'batch_ingested' ||
+      message.type === 'artemis_synced'
+    ) {
+      try {
+        await refreshAll();
+      } catch (_) {}
+    }
+  };
+}
+
+document.getElementById('refreshBtn').addEventListener('click', refreshAll);
+document.getElementById('syncBtn').addEventListener('click', syncArtemis);
+document.getElementById('previewBtn').addEventListener('click', previewArtemis);
+
+refreshAll().then(connectLive).catch(() => connectLive());
+</script>
+</body>
+</html>
